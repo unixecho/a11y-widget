@@ -14,6 +14,7 @@ export const A11Y_UI: Record<string, Record<Lang, string>> = {
   },
   close: { he: 'סגירה', en: 'Close', ar: 'إغلاق' },
   reset: { he: 'איפוס הגדרות', en: 'Reset settings', ar: 'إعادة ضبط الإعدادات' },
+  statementLink: { he: 'הצהרת נגישות', en: 'Accessibility statement', ar: 'بيان إمكانية الوصول' },
 
   profilesSection: { he: 'פרופילים מהירים', en: 'Quick profiles', ar: 'ملفات تعريف سريعة' },
   profileApplied: { he: 'הפרופיל הופעל', en: 'Profile applied', ar: 'تم تطبيق الملف الشخصي' },

@@ -117,13 +117,23 @@ export default function A11yPanel({ open, onClose }: { open: boolean; onClose: (
         </Section>
       </div>
 
-      <div style={{ paddingTop: 12, display: 'flex', gap: 8 }}>
-        <button type="button" className="a11yw-btn-secondary a11yw-press" onClick={() => { haptic('tick'); reset() }} style={{ flex: 1 }}>
-          {t('reset')}
-        </button>
-        <button type="button" className="a11yw-btn-primary a11yw-press" onClick={onClose} style={{ flex: 1 }}>
-          {t('close')}
-        </button>
+      <div style={{ paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="a11yw-btn-secondary a11yw-press" onClick={() => { haptic('tick'); reset() }} style={{ flex: 1 }}>
+            {t('reset')}
+          </button>
+          <button type="button" className="a11yw-btn-primary a11yw-press" onClick={onClose} style={{ flex: 1 }}>
+            {t('close')}
+          </button>
+        </div>
+        {config.statementHref && (
+          <a
+            href={config.statementHref}
+            style={{ textAlign: 'center', fontSize: '0.82rem', color: 'var(--a11y-accent, var(--neon-2, #38e1ff))', textDecoration: 'none' }}
+          >
+            {t('statementLink')}
+          </a>
+        )}
       </div>
     </A11ySheet>
   )

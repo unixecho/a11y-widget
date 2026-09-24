@@ -163,6 +163,12 @@ export interface A11yWidgetConfig {
   /** Seed language before the DOM's own `<html lang>` is observed — avoids a
    *  flash of the wrong language on a host whose default isn't Hebrew. */
   defaultLang?: Lang
+  /** Path to the host's own accessibility statement page (e.g.
+   *  '/accessibility'). When set, the panel renders a link to it — a
+   *  visitor who wants the full legal statement, not just the live
+   *  controls, has one tap to get there. Omitted entirely (no link shown)
+   *  when not set, rather than guessing at a route that might not exist. */
+  statementHref?: string
 }
 
 export const DEFAULT_A11Y_CONFIG: Required<Pick<A11yWidgetConfig, 'corner' | 'storageKey' | 'defaultLang'>> = {
