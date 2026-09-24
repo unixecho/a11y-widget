@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **`config.statementHref`** — an optional link in the panel footer to the
+  host's own accessibility statement page. Matches a feature
+  Sarcafe-Portal's pre-migration widget already had that AyekaBar's didn't;
+  omitted entirely when not configured rather than guessing at a route.
+
 ## 1.0.0 — 2026-09-24
 
 Initial release. Extracted from AyekaBar's in-house accessibility widget
