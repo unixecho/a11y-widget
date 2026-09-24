@@ -37,11 +37,16 @@ const WORD_SPACING = ['normal', '0.12em', '0.2em', '0.3em']
 const LINE_HEIGHT = ['normal', '1.6', '1.8', '2.15']
 
 export function computeAppliedState(prefs: A11yPrefs): AppliedA11yState {
+  // Non-null assertions below are sound by construction, not a shortcut:
+  // FontScaleStep/SpacingStep are closed unions (0..4 / 0..3) whose every
+  // member has a matching array slot, so a some-consumer-tsconfig's
+  // `noUncheckedIndexedAccess` sees `T | undefined` where the actual domain
+  // guarantees `T`.
   const rootVars: Record<string, string> = {
-    '--a11y-font-scale': FONT_SCALE_PCT[prefs.fontScale],
-    '--a11y-letter-spacing': LETTER_SPACING[prefs.spacing],
-    '--a11y-word-spacing': WORD_SPACING[prefs.spacing],
-    '--a11y-line-height': LINE_HEIGHT[prefs.spacing],
+    '--a11y-font-scale': FONT_SCALE_PCT[prefs.fontScale]!,
+    '--a11y-letter-spacing': LETTER_SPACING[prefs.spacing]!,
+    '--a11y-word-spacing': WORD_SPACING[prefs.spacing]!,
+    '--a11y-line-height': LINE_HEIGHT[prefs.spacing]!,
   }
 
   const rootClasses: string[] = []

@@ -4,7 +4,11 @@
 
 import type { Lang } from './types'
 
-export const A11Y_UI: Record<string, Record<Lang, string>> = {
+// `satisfies`, not `:` — a type annotation would widen the key type to
+// `string`, which is exactly what defeats keyof-based exhaustiveness (and
+// is why a11yT below needed a non-null assertion in the first place before
+// this fix).
+export const A11Y_UI = {
   title: { he: 'נגישות האתר', en: 'Accessibility', ar: 'إمكانية الوصول' },
   openLabel: { he: 'פתיחת אפשרויות נגישות', en: 'Open accessibility options', ar: 'فتح خيارات إمكانية الوصول' },
   intro: {
@@ -53,7 +57,7 @@ export const A11Y_UI: Record<string, Record<Lang, string>> = {
 
   on: { he: 'פעיל', en: 'On', ar: 'مفعّل' },
   off: { he: 'כבוי', en: 'Off', ar: 'معطّل' },
-}
+} satisfies Record<string, Record<Lang, string>>
 
 export type A11yUiKey = keyof typeof A11Y_UI
 

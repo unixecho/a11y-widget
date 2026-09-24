@@ -79,8 +79,11 @@ export default function A11ySheet({
       if (e.key !== 'Tab') return
       const list = focusables()
       if (!list.length) return
-      const first = list[0]
-      const last = list[list.length - 1]
+      // Non-null: the length check above guarantees both indices exist —
+      // a strict consumer tsconfig (noUncheckedIndexedAccess) just can't
+      // see that guard statically.
+      const first = list[0]!
+      const last = list[list.length - 1]!
       const active = document.activeElement as HTMLElement | null
       const inside = !!panelRef.current?.contains(active)
       if (e.shiftKey) {
