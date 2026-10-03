@@ -74,6 +74,40 @@ export const CONTRAST_MODES: ContrastMode[] = ['default', 'high', 'grayscale', '
  *  must not flip meaning under RTL. */
 export type A11yCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
+/** Every selectable launcher corner, in reading order (top row, then bottom
+ *  row). The panel's position picker renders from this list, so a corner
+ *  added to `A11yCorner` but forgotten here would silently be unselectable —
+ *  scripts/check-a11y.mjs pins the two together. */
+export const A11Y_CORNERS: A11yCorner[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+
+export function isA11yCorner(v: unknown): v is A11yCorner {
+  return typeof v === 'string' && (A11Y_CORNERS as string[]).includes(v)
+}
+
+/** The key that opens/closes the panel — and, while the launcher is hidden,
+ *  brings it back. One constant so the handler, the intro label, the toast
+ *  and the panel hint can never name different keys. */
+export const A11Y_SHORTCUT_KEY = 'F2'
+
+/** Widget-UI state: where the launcher sits and whether its first-visit intro
+ *  has played. Deliberately NOT part of `A11yPrefs`: those are the page
+ *  adjustments a visitor makes (and what "Reset settings" clears), while this
+ *  is about the widget's own chrome. Keeping them apart also leaves the
+ *  `A11yPrefs` shape untouched — AyekaBar's older in-house copy still reads
+ *  the same storage key. Persisted under its own key, see `a11yUiStorageKey`.
+ *
+ *  Whether the launcher is currently hidden is NOT stored here, on purpose —
+ *  see lifecycle.ts. */
+export interface A11yUiState {
+  /** The visitor's own corner choice. `null` = never chose, so the host's
+   *  `config.corner` (or the package default) applies. */
+  corner: A11yCorner | null
+  /** True once the full first-visit intro has played on this device. */
+  introSeen: boolean
+}
+
+export const DEFAULT_A11Y_UI: A11yUiState = { corner: null, introSeen: false }
+
 /** A one-tap COMPOSITION of the real prefs above — never a capability that
  *  doesn't otherwise exist in this widget. Modelled on the "quick profiles"
  *  pattern of commercial accessibility widgets, but every profile here is
@@ -143,7 +177,9 @@ export const QUICK_PROFILES: QuickProfile[] = [
 ]
 
 export interface A11yWidgetConfig {
-  /** Physical corner for the launcher button. Default 'bottom-right'. */
+  /** DEFAULT physical corner for the launcher button. Default 'bottom-right'.
+   *  A visitor can move the button to any corner from the panel; once they
+   *  have, their choice wins over this on that device. */
   corner?: A11yCorner
   /** CSS color (any valid value) for the launcher/panel accent. Falls back
    *  to `var(--neon)` if the host defines it, else a neutral built-in
@@ -175,4 +211,25 @@ export const DEFAULT_A11Y_CONFIG: Required<Pick<A11yWidgetConfig, 'corner' | 'st
   corner: 'bottom-right',
   storageKey: 'a11y-widget:prefs:v1',
   defaultLang: 'he',
+}
+
+export type ResolvedA11yConfig = Required<Pick<A11yWidgetConfig, 'corner' | 'storageKey' | 'defaultLang'>> & A11yWidgetConfig
+
+/** The host's config with the three defaulted fields guaranteed present.
+ *
+ *  `{ ...defaults, ...config }` alone is not enough: an explicit
+ *  `corner: undefined` — what a host passes when it forwards an optional
+ *  value of its own — is an own property, and spreading it OVERWRITES the
+ *  default with undefined. So the three fields are re-resolved with `??`.
+ *  The corner is also checked against the real list: a JS host passing a
+ *  logical or misspelled value gets the default, not a launcher with no
+ *  position class. */
+export function resolveA11yConfig(config: A11yWidgetConfig): ResolvedA11yConfig {
+  return {
+    ...DEFAULT_A11Y_CONFIG,
+    ...config,
+    corner: isA11yCorner(config.corner) ? config.corner : DEFAULT_A11Y_CONFIG.corner,
+    storageKey: config.storageKey ?? DEFAULT_A11Y_CONFIG.storageKey,
+    defaultLang: config.defaultLang ?? DEFAULT_A11Y_CONFIG.defaultLang,
+  }
 }

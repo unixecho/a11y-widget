@@ -25,7 +25,7 @@ const FOCUSABLE = [
 ].join(',')
 
 export default function A11ySheet({
-  open, onClose, label, children, footer, dir,
+  open, onClose, label, children, footer, dir, restoreFocus = true,
 }: {
   open: boolean
   onClose: () => void
@@ -35,9 +35,19 @@ export default function A11ySheet({
   /** Rendered outside the scrolling area, pinned to the bottom of the panel. */
   footer?: ReactNode
   dir: 'rtl' | 'ltr'
+  /** Return focus to whatever opened the sheet when it closes. On by default;
+   *  the one caller that turns it off is the "hide the button" path, where the
+   *  opener is the launcher that is about to unmount — focusing it would only
+   *  hand focus to something that vanishes a moment later. */
+  restoreFocus?: boolean
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
   const returnFocusTo = useRef<HTMLElement | null>(null)
+  // Read through a ref, not the closure: the effect below tears down in the
+  // same commit that flips this prop, and a captured value would be the one
+  // from before the sheet was asked to close without restoring.
+  const restoreFocusRef = useRef(restoreFocus)
+  restoreFocusRef.current = restoreFocus
 
   const focusables = useCallback((): HTMLElement[] => {
     const panel = panelRef.current
@@ -65,7 +75,7 @@ export default function A11ySheet({
       document.body.style.overflow = prevOverflow
       window.clearTimeout(t)
       const active = document.activeElement
-      if (!active || active === document.body || panelRef.current?.contains(active)) {
+      if (restoreFocusRef.current && (!active || active === document.body || panelRef.current?.contains(active))) {
         returnFocusTo.current?.focus?.()
       }
     }

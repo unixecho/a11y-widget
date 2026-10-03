@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+- **Hide the button, and a quick way back.** A "Hide this button" control,
+  pinned to the foot of the panel, hides the launcher. It plays an outro, then
+  a toast in the same corner shows how to bring it back: **F2**, the toast's
+  *Bring it back* button, or a page refresh. F2 keeps working while the button
+  is hidden and restores it and opens the panel. Adjustments the visitor already
+  chose stay applied. Hiding is **not persisted** — a reload always restores
+  the button, so nobody is locked out of the tool.
+- **Visitor-chosen corner.** A picker in the panel moves the button to any of
+  the four corners (arrow keys work); the button glides there and the choice is
+  saved on the device. `config.corner` is now only the *default*.
+- **Intro.** First visit: spring-in, two pulses, and a label pill with the name
+  and shortcut. Every later load and every restore: a quick spring-in. Both are
+  skipped down to "just appears" under the OS reduced-motion setting and under
+  the widget's own *Pause animations*.
+- **Toast** (`A11yToast`, also exported) — a persistent `aria-live` region with
+  the toast inserted into it; pauses on hover and focus (WCAG 2.2.1); never
+  dismisses on a CSS animation event, so "Pause animations" cannot make it vanish
+  early; hands focus to its button when the hide came from the panel.
+- **New storage key `<storageKey>:ui`** holding `{ corner, introSeen }`. Separate
+  from the prefs key, so `A11yPrefs` is unchanged and *Reset settings* does not
+  move the button. No migration needed.
+- **Fix: an explicit `undefined` in `config` no longer overrides a default.**
+  `{ ...defaults, ...config }` copied `corner: undefined` over the default;
+  `resolveA11yConfig` (exported) now resolves the three defaulted fields with
+  `??`, and an invalid `corner` falls back to the default.
+- `WIDGET_COVERAGE` gains two items (`launcher-position`, `hide-launcher`).
+  A host that renders it on its statement page will list them automatically
+  after upgrading — worth a read-through of that page.
+- `A11yLauncher` gains optional `phase`, `intro` and `autoFocus` props, and
+  `A11yPanel` optional `onHide` and `restoreFocus`; omitting them keeps the
+  old, static behaviour for anyone composing the pieces by hand. `A11ySheet`
+  gains `restoreFocus` (default `true`).
+- Provider context gains `corner`, `setCorner`, `introSeen`, `markIntroSeen`.
+
 - **`config.statementHref`** — an optional link in the panel footer to the
   host's own accessibility statement page. Matches a feature
   Sarcafe-Portal's pre-migration widget already had that AyekaBar's didn't;

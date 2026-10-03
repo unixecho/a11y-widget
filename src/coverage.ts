@@ -126,6 +126,22 @@ export const WIDGET_COVERAGE: CoverageItem[] = [
     },
   },
   {
+    id: 'launcher-position',
+    labels: {
+      he: 'בחירת הפינה במסך שבה יופיע כפתור הנגישות (למעלה/למטה, ימין/שמאל), כדי שיישאר מחוץ לדרך של תוכן העמוד',
+      en: 'Choosing which screen corner the accessibility button sits in (top/bottom, left/right), so it stays out of the way of the page’s own content',
+      ar: 'اختيار ركن الشاشة الذي يظهر فيه زر إمكانية الوصول (أعلى/أسفل، يمين/يسار) ليبقى بعيدًا عن محتوى الصفحة',
+    },
+  },
+  {
+    id: 'hide-launcher',
+    labels: {
+      he: 'אפשרות להסתיר את כפתור הנגישות בביקור הנוכחי ולהחזירו בקיצור מקלדת או ברענון הדף; ההתאמות שנבחרו נשארות פעילות',
+      en: 'An option to hide the accessibility button for the current visit and bring it back with a keyboard shortcut or a page refresh; the adjustments already chosen stay active',
+      ar: 'خيار لإخفاء زر إمكانية الوصول أثناء الزيارة الحالية وإعادته باختصار لوحة المفاتيح أو بإعادة تحميل الصفحة؛ وتبقى التعديلات المختارة مفعّلة',
+    },
+  },
+  {
     id: 'persisted',
     labels: {
       he: 'ההעדפות נשמרות במכשיר ונשארות פעילות בביקורים הבאים, עד לאיפוס ידני',

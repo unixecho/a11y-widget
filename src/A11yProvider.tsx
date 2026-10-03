@@ -1,8 +1,11 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { DEFAULT_A11Y_CONFIG, DEFAULT_A11Y_PREFS, RTL_LANGS, type A11yPrefs, type A11yWidgetConfig, type Lang } from './types'
-import { loadA11yPrefs, saveA11yPrefs } from './storage'
+import {
+  DEFAULT_A11Y_PREFS, DEFAULT_A11Y_UI, RTL_LANGS, resolveA11yConfig,
+  type A11yCorner, type A11yPrefs, type A11yUiState, type A11yWidgetConfig, type Lang, type ResolvedA11yConfig,
+} from './types'
+import { a11yUiStorageKey, loadA11yPrefs, loadA11yUi, saveA11yPrefs, saveA11yUi } from './storage'
 import { computeAppliedState, ALL_A11Y_HTML_CLASSES } from './apply'
 import { injectA11yStyles } from './internal/style'
 
@@ -17,9 +20,16 @@ interface A11yContextValue {
   set: <K extends keyof A11yPrefs>(key: K, value: A11yPrefs[K]) => void
   patch: (partial: Partial<A11yPrefs>) => void
   reset: () => void
+  /** The corner the launcher actually sits in: the visitor's own choice if
+   *  they have made one, else the host's `config.corner`. */
+  corner: A11yCorner
+  setCorner: (corner: A11yCorner) => void
+  /** Whether the full first-visit intro has already played on this device. */
+  introSeen: boolean
+  markIntroSeen: () => void
   lang: Lang
   dir: 'rtl' | 'ltr'
-  config: Required<Pick<A11yWidgetConfig, 'corner' | 'storageKey' | 'defaultLang'>> & A11yWidgetConfig
+  config: ResolvedA11yConfig
 }
 
 const A11yContext = createContext<A11yContextValue | null>(null)
@@ -31,17 +41,23 @@ export function useA11y(): A11yContextValue {
 }
 
 export default function A11yProvider({ children, config = {} }: { children: ReactNode; config?: A11yWidgetConfig }) {
-  const resolvedConfig = useMemo(() => ({ ...DEFAULT_A11Y_CONFIG, ...config }), [config])
+  const resolvedConfig = useMemo(() => resolveA11yConfig(config), [config])
   const [prefs, setPrefsState] = useState<A11yPrefs>(DEFAULT_A11Y_PREFS)
+  const [ui, setUi] = useState<A11yUiState>(DEFAULT_A11Y_UI)
   const [ready, setReady] = useState(false)
   const [lang, setLang] = useState<Lang>(resolvedConfig.defaultLang)
+  const uiKey = a11yUiStorageKey(resolvedConfig.storageKey)
 
   useEffect(() => { injectA11yStyles() }, [])
 
   // Client-only load — rendering a preference that then jumps on first paint
-  // is worse than rendering the default for one frame.
+  // is worse than rendering the default for one frame. The widget-UI state
+  // (corner, intro seen) loads in the same batch as the prefs, so `ready`
+  // means both are hydrated and the launcher can never appear in the default
+  // corner for a frame before jumping to the visitor's own.
   useEffect(() => {
     setPrefsState(loadA11yPrefs(resolvedConfig.storageKey))
+    setUi(loadA11yUi(a11yUiStorageKey(resolvedConfig.storageKey)))
     setReady(true)
     // Only ever re-run if the storage key itself changes (it shouldn't,
     // mid-session) — loading is a one-time hydration step, not a subscription.
@@ -51,6 +67,10 @@ export default function A11yProvider({ children, config = {} }: { children: Reac
   useEffect(() => {
     if (ready) saveA11yPrefs(resolvedConfig.storageKey, prefs)
   }, [prefs, ready, resolvedConfig.storageKey])
+
+  useEffect(() => {
+    if (ready) saveA11yUi(uiKey, ui)
+  }, [ui, ready, uiKey])
 
   // Track <html lang>. No app-wide language context is assumed to exist —
   // every host may manage its own `lang` state independently — so this
@@ -91,11 +111,25 @@ export default function A11yProvider({ children, config = {} }: { children: Reac
   const patch = useCallback((partial: Partial<A11yPrefs>) => {
     setPrefsState((prev) => ({ ...prev, ...partial }))
   }, [])
+  // `reset` clears the page adjustments only. Where the visitor parked the
+  // button is a separate, deliberate choice about the widget's own chrome —
+  // "Reset settings" should not silently drag it back to another corner.
   const reset = useCallback(() => setPrefsState({ ...DEFAULT_A11Y_PREFS }), [])
 
+  const setCorner = useCallback((c: A11yCorner) => {
+    setUi((prev) => (prev.corner === c ? prev : { ...prev, corner: c }))
+  }, [])
+  const markIntroSeen = useCallback(() => {
+    setUi((prev) => (prev.introSeen ? prev : { ...prev, introSeen: true }))
+  }, [])
+  const corner = ui.corner ?? resolvedConfig.corner
+
   const value = useMemo(
-    () => ({ prefs, ready, set, patch, reset, lang, dir, config: resolvedConfig }),
-    [prefs, ready, set, patch, reset, lang, dir, resolvedConfig],
+    () => ({
+      prefs, ready, set, patch, reset, corner, setCorner,
+      introSeen: ui.introSeen, markIntroSeen, lang, dir, config: resolvedConfig,
+    }),
+    [prefs, ready, set, patch, reset, corner, setCorner, ui.introSeen, markIntroSeen, lang, dir, resolvedConfig],
   )
 
   return <A11yContext.Provider value={value}>{children}</A11yContext.Provider>

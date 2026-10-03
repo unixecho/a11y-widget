@@ -79,13 +79,18 @@ in a new codebase.
 
 ```ts
 interface A11yWidgetConfig {
-  corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' // default 'bottom-right'
+  corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' // DEFAULT corner, 'bottom-right' — a visitor can move it, see below
   accentColor?: string       // CSS color; falls back to var(--neon) or a built-in default
   onHaptic?: (pattern: 'tick' | 'select') => void  // inject your own haptics module; never guessed at here
   storageKey?: string        // localStorage key — SEE MIGRATION NOTE BELOW
   defaultLang?: 'he' | 'en' | 'ar'  // seed before <html lang> is observed
+  statementHref?: string     // link to the host's own accessibility statement, shown in the panel footer
 }
 ```
+
+An explicit `undefined` for any of these (what you pass when forwarding an
+optional value of your own) behaves like leaving it out; an invalid `corner`
+falls back to the default.
 
 **Migrating an app off its own earlier copy of this widget?** Pass that
 app's *existing* localStorage key as `storageKey`. That is what preserves
@@ -93,6 +98,55 @@ visitors' already-saved preferences across the migration instead of
 silently resetting them the first time they load the new version.
 AyekaBar's key was `ayeka.a11y.prefs.v1`; Sarcafe-Portal's was
 `sarcafe:a11y-prefs`.
+
+### Storage
+
+Two `localStorage` keys, both derived from `storageKey`:
+
+| Key | Holds |
+|---|---|
+| `<storageKey>` | the page adjustments (`A11yPrefs`) — what *Reset settings* clears |
+| `<storageKey>:ui` | the widget's own chrome: `{ corner, introSeen }` |
+
+They are separate on purpose. *Reset settings* clears adjustments, and should
+not silently drag the button back to another corner; and keeping the `A11yPrefs`
+shape untouched means an app still reading the key with an older copy of this
+widget keeps working. Upgrading needs no migration — a missing `:ui` key just
+means "never chose a corner, intro not yet seen".
+
+## The button itself: hide it, move it, how it arrives
+
+A floating button can sit on top of a host page's own UI — a bottom tab bar, a
+cookie banner, a chat bubble — so the visitor is in charge of it. All of this
+lives in the panel and needs no host configuration.
+
+- **Hide this button.** A control pinned to the foot of the panel hides the
+  launcher. It plays a short outro (drawn back into its corner) and a toast
+  appears in the same corner explaining the three ways back: press **F2**, press
+  the toast's *Bring it back* button, or just refresh the page. The toast
+  stays for 10 seconds, pauses while it is hovered or holds focus, and takes
+  keyboard focus when the hide was done from the keyboard.
+  - Only the *button* is hidden. Every adjustment the visitor chose (text size,
+    contrast, reading guide…) stays applied.
+  - **Hiding is deliberately not remembered across reloads.** A hide that
+    survived a refresh could lock out a visitor who hid it by accident and
+    does need it, and "refresh the page" is the one recovery that needs no
+    keyboard and nothing to discover. (Client-side navigation keeps the widget
+    mounted, so it also stays hidden while the visitor browses; it returns on
+    a real reload.)
+  - **F2 keeps working while the button is hidden** — that is what makes it the
+    quick way back. It restores the button *and* opens the panel.
+- **Button position.** A picker — a miniature screen with a target in each
+  corner — moves the button to any of the four corners (arrow keys work too),
+  and the button glides there. The choice is saved on the device. `config.corner`
+  is only the *default*, for visitors who have not chosen.
+- **Intro.** On a visitor's very first visit the button springs in, pulses twice
+  and unfolds into a pill showing its name and shortcut, then folds back into a
+  circle. Every later load, and every restore, is just the quick spring-in.
+- **Reduced motion.** The OS "reduce motion" setting and the widget's own
+  *Pause animations* both strip this down: the button simply appears and
+  disappears, with no pill and no pulse, and nothing waits on an animation that
+  has been switched off.
 
 ## What's real, and why the profiles aren't a shortcut around that
 

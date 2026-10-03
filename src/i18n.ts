@@ -11,6 +11,11 @@ import type { Lang } from './types'
 export const A11Y_UI = {
   title: { he: 'נגישות האתר', en: 'Accessibility', ar: 'إمكانية الوصول' },
   openLabel: { he: 'פתיחת אפשרויות נגישות', en: 'Open accessibility options', ar: 'فتح خيارات إمكانية الوصول' },
+  // The short word shown on the first-visit intro pill. Kept as its own key
+  // (not `title`) because it must appear inside `openLabel`'s wording — WCAG
+  // 2.5.3 Label in Name: voice control says what it SEES, and Hebrew's
+  // `title` ("נגישות האתר") is not a substring of the button's accessible name.
+  launcherLabel: { he: 'נגישות', en: 'Accessibility', ar: 'إمكانية الوصول' },
   intro: {
     he: 'הגדרות תצוגה אישיות לביקור הזה. אינן מחליפות את הנגישות של האתר עצמו.',
     en: 'Personal display settings for this visit. They do not replace the site’s own accessibility.',
@@ -54,6 +59,40 @@ export const A11Y_UI = {
     en: 'Read-aloud isn’t supported in this browser',
     ar: 'القراءة الصوتية غير مدعومة في هذا المتصفح',
   },
+
+  // ── the launcher button itself: where it sits, and hiding it ──────────────
+  // `{key}` is replaced with the shortcut key as a <kbd> (see internal/KeyHint)
+  // — a placeholder rather than a hardcoded "F2" so the key is named in
+  // exactly one place (A11Y_SHORTCUT_KEY) and sits correctly inside RTL text.
+  positionSection: { he: 'מיקום הכפתור', en: 'Button position', ar: 'موضع الزر' },
+  positionGroup: {
+    he: 'בחירת פינה במסך לכפתור הנגישות',
+    en: 'Choose a screen corner for the accessibility button',
+    ar: 'اختر ركنًا من الشاشة لزر إمكانية الوصول',
+  },
+  cornerTopLeft: { he: 'למעלה משמאל', en: 'Top left', ar: 'أعلى اليسار' },
+  cornerTopRight: { he: 'למעלה מימין', en: 'Top right', ar: 'أعلى اليمين' },
+  cornerBottomLeft: { he: 'למטה משמאל', en: 'Bottom left', ar: 'أسفل اليسار' },
+  cornerBottomRight: { he: 'למטה מימין', en: 'Bottom right', ar: 'أسفل اليمين' },
+
+  hideButton: { he: 'הסתרת הכפתור', en: 'Hide this button', ar: 'إخفاء الزر' },
+  hideHint: {
+    he: 'חוזר בלחיצה על {key} או ברענון הדף. ההגדרות שלכם נשארות פעילות.',
+    en: 'Bring it back with {key} or by refreshing the page. Your settings stay on.',
+    ar: 'أعده بالضغط على {key} أو بإعادة تحميل الصفحة. تبقى إعداداتك مفعّلة.',
+  },
+
+  // The toast shown after the button is hidden.
+  toastTitle: { he: 'כפתור הנגישות הוסתר', en: 'Accessibility button hidden', ar: 'تم إخفاء زر إمكانية الوصول' },
+  toastSettings: { he: 'ההגדרות שבחרתם נשארות פעילות.', en: 'Your settings stay on.', ar: 'تبقى إعداداتك مفعّلة.' },
+  toastKeyHint: { he: 'הקישו {key} כדי להחזיר אותו.', en: 'Press {key} to bring it back.', ar: 'اضغط {key} لإعادته.' },
+  toastRefreshHint: {
+    he: 'או פשוט רעננו את הדף — הכפתור יחזור מעצמו.',
+    en: 'Or just refresh the page — it comes back on its own.',
+    ar: 'أو أعد تحميل الصفحة — وسيعود الزر تلقائيًا.',
+  },
+  toastRestore: { he: 'החזרת הכפתור', en: 'Bring it back', ar: 'إعادة الزر' },
+  toastDismiss: { he: 'סגירת ההודעה', en: 'Dismiss', ar: 'إغلاق الإشعار' },
 
   on: { he: 'פעיל', en: 'On', ar: 'مفعّل' },
   off: { he: 'כבוי', en: 'Off', ar: 'معطّل' },

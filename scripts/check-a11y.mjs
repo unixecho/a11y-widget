@@ -19,6 +19,14 @@
 //   • Every panel string, quick-profile label/description, and coverage-item
 //     label exists in all three languages (he/en/ar) — a missing language is
 //     a silent blank in the UI, not a crash, so nothing else would catch it.
+//   • sanitizeA11yUi (corner choice + intro-seen) holds the same never-trust
+//     discipline as the prefs, and the corner list stays pinned to the type.
+//   • The launcher lifecycle reducer (hide / restore / toast) keeps its four
+//     invariants under any sequence of events, not just the ones a person
+//     would think to click — see lifecycle.ts.
+//   • The `{key}` placeholder appears in exactly the strings that are rendered
+//     through withKey(), so it can neither leak into an aria-label as literal
+//     braces nor go missing from a sentence that is meant to name the key.
 
 import ts from 'typescript'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -45,7 +53,7 @@ function emit(name) {
   writeFileSync(join(outDir, name.replace(/\.ts$/, '.mjs')), js)
 }
 
-for (const f of ['types.ts', 'storage.ts', 'apply.ts', 'i18n.ts', 'coverage.ts']) emit(f)
+for (const f of ['types.ts', 'storage.ts', 'apply.ts', 'i18n.ts', 'coverage.ts', 'corners.ts', 'lifecycle.ts']) emit(f)
 
 const load = (name) => import(pathToFileURL(join(outDir, name)).href)
 const T = await load('types.mjs')
@@ -53,6 +61,8 @@ const S = await load('storage.mjs')
 const A = await load('apply.mjs')
 const I18n = await load('i18n.mjs')
 const Cov = await load('coverage.mjs')
+const C = await load('corners.mjs')
+const L = await load('lifecycle.mjs')
 
 // ── harness ────────────────────────────────────────────────────────────
 
@@ -194,6 +204,245 @@ section('i18n — every panel string, quick profile and coverage item is triling
   ))
   check('WIDGET_COVERAGE ids are unique', new Set(Cov.WIDGET_COVERAGE.map((c) => c.id)).size === Cov.WIDGET_COVERAGE.length)
   check('QUICK_PROFILES ids are unique', new Set(T.QUICK_PROFILES.map((p) => p.id)).size === T.QUICK_PROFILES.length)
+
+  // `{key}` is swapped for a <kbd> by withKey() — and ONLY in the strings the
+  // components actually pass through it. Anywhere else it would render as
+  // literal braces (an aria-label, an announcement); and a string that is
+  // meant to name the key but lost its placeholder would silently stop doing so.
+  const WITH_KEY = new Set(['hideHint', 'toastKeyHint'])
+  const keyMismatches = []
+  for (const key of Object.keys(I18n.A11Y_UI)) {
+    for (const lang of langs) {
+      const has = I18n.A11Y_UI[key][lang].includes('{key}')
+      if (has !== WITH_KEY.has(key)) keyMismatches.push(`${key}.${lang}`)
+    }
+  }
+  check('{key} appears in exactly the strings rendered through withKey()', keyMismatches.length === 0, keyMismatches.join(', '))
+
+  check('every launcher corner has a label string in i18n',
+    ['cornerTopLeft', 'cornerTopRight', 'cornerBottomLeft', 'cornerBottomRight'].every((k) => k in I18n.A11Y_UI) &&
+    T.A11Y_CORNERS.length === 4)
+  check('the new coverage items exist',
+    ['launcher-position', 'hide-launcher'].every((id) => Cov.WIDGET_COVERAGE.some((c) => c.id === id)))
+}
+
+// ── 4. widget-UI state — corner choice and intro-seen ──────────────────
+section('sanitizeA11yUi — same never-trust discipline as the prefs')
+{
+  const d = T.DEFAULT_A11Y_UI
+  const j = JSON.stringify
+
+  check('the default is "never chose a corner, intro not yet seen"', d.corner === null && d.introSeen === false)
+  check('null / undefined / a string / an array all return the default',
+    [null, undefined, 'nope', [1, 2]].every((v) => j(S.sanitizeA11yUi(v)) === j(d)))
+  check('every real corner survives',
+    T.A11Y_CORNERS.every((c) => S.sanitizeA11yUi({ corner: c }).corner === c))
+  check('an invented corner falls back to null (use the host default)',
+    S.sanitizeA11yUi({ corner: 'middle' }).corner === null)
+  check('a logical corner ("start-top") is rejected — corners are physical only',
+    S.sanitizeA11yUi({ corner: 'top-start' }).corner === null)
+  check('a non-string corner falls back', S.sanitizeA11yUi({ corner: 3 }).corner === null)
+  check('introSeen survives as a real boolean', S.sanitizeA11yUi({ introSeen: true }).introSeen === true)
+  check('a non-boolean introSeen falls back to false', S.sanitizeA11yUi({ introSeen: 'yes' }).introSeen === false)
+  check('one bad field does not poison the other',
+    j(S.sanitizeA11yUi({ corner: 'nope', introSeen: true })) === j({ corner: null, introSeen: true }))
+  check('an unknown extra key is silently dropped', S.sanitizeA11yUi({ evil: '<script>' }).evil === undefined)
+
+  check('the UI blob lives under its own key, never the prefs key',
+    S.a11yUiStorageKey('ayeka.a11y.prefs.v1') !== 'ayeka.a11y.prefs.v1' &&
+    S.a11yUiStorageKey('ayeka.a11y.prefs.v1').startsWith('ayeka.a11y.prefs.v1'))
+
+  // load/save against a stand-in localStorage. The modules read `window` at
+  // call time, so stubbing the global is enough.
+  const store = new Map()
+  globalThis.window = {
+    localStorage: {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => { store.set(k, String(v)) },
+    },
+  }
+  const key = S.a11yUiStorageKey('test:prefs')
+  check('nothing stored loads as the default', j(S.loadA11yUi(key)) === j(d))
+  S.saveA11yUi(key, { corner: 'top-left', introSeen: true })
+  check('a saved value round-trips', j(S.loadA11yUi(key)) === j({ corner: 'top-left', introSeen: true }))
+  store.set(key, '{not json')
+  check('corrupt JSON loads as the default and does not throw', j(S.loadA11yUi(key)) === j(d))
+  store.set(key, j({ corner: 'bottom-left', introSeen: 1, junk: [] }))
+  check('a half-valid blob keeps its valid half',
+    j(S.loadA11yUi(key)) === j({ corner: 'bottom-left', introSeen: false }))
+  globalThis.window = {
+    localStorage: {
+      getItem: () => { throw new Error('blocked') },
+      setItem: () => { throw new Error('quota') },
+    },
+  }
+  check('blocked storage: load returns the default', j(S.loadA11yUi(key)) === j(d))
+  let saveThrew = false
+  try { S.saveA11yUi(key, d) } catch { saveThrew = true }
+  check('blocked storage: save does not throw', !saveThrew)
+  delete globalThis.window
+  check('no window (server render): load returns the default', j(S.loadA11yUi(key)) === j(d))
+}
+
+// ── 4b. resolveA11yConfig — a host's explicit `undefined` must not win ──
+section('resolveA11yConfig — defaults survive an explicit undefined')
+{
+  const D = T.DEFAULT_A11Y_CONFIG
+  // The regression this exists for: `<A11yWidget config={{ corner: maybeUndefined }} />`.
+  // A plain `{ ...defaults, ...config }` copies the undefined over the default
+  // and the launcher mounts with no corner at all.
+  const r = T.resolveA11yConfig({ corner: undefined, storageKey: undefined, defaultLang: undefined })
+  check('explicit undefined corner keeps the default corner', r.corner === D.corner)
+  check('explicit undefined storageKey keeps the default key', r.storageKey === D.storageKey)
+  check('explicit undefined defaultLang keeps the default language', r.defaultLang === D.defaultLang)
+  check('an empty config resolves to exactly the defaults',
+    JSON.stringify(T.resolveA11yConfig({})) === JSON.stringify(D))
+  check('real values win over the defaults',
+    T.resolveA11yConfig({ corner: 'top-left', storageKey: 'k', defaultLang: 'en' }).corner === 'top-left' &&
+    T.resolveA11yConfig({ storageKey: 'k' }).storageKey === 'k' &&
+    T.resolveA11yConfig({ defaultLang: 'ar' }).defaultLang === 'ar')
+  check('an invalid corner from a JS host falls back to the default',
+    ['top-start', 'middle', '', null, 3].every((c) => T.resolveA11yConfig({ corner: c }).corner === D.corner))
+  check('other config keys pass through untouched',
+    T.resolveA11yConfig({ accentColor: '#fff', statementHref: '/a' }).statementHref === '/a' &&
+    T.resolveA11yConfig({ accentColor: '#fff' }).accentColor === '#fff')
+}
+
+// ── 5. corners — the picker's arrow keys and the corner list ───────────
+section('corners — physical corners, and the picker\'s arrow-key moves')
+{
+  check('A11Y_CORNERS has four unique corners', new Set(T.A11Y_CORNERS).size === 4 && T.A11Y_CORNERS.length === 4)
+  check('the package default corner is selectable', T.A11Y_CORNERS.includes(T.DEFAULT_A11Y_CONFIG.corner))
+  check('isA11yCorner accepts every corner and nothing else',
+    T.A11Y_CORNERS.every(T.isA11yCorner) && !['', 'left', 'top', 'top-start', null, 7].some(T.isA11yCorner))
+
+  const expectH = { 'top-left': 'top-right', 'top-right': 'top-left', 'bottom-left': 'bottom-right', 'bottom-right': 'bottom-left' }
+  const expectV = { 'top-left': 'bottom-left', 'top-right': 'bottom-right', 'bottom-left': 'top-left', 'bottom-right': 'top-right' }
+  check('horizontal flips left<->right and keeps the row',
+    T.A11Y_CORNERS.every((c) => C.flipCorner(c, 'horizontal') === expectH[c]))
+  check('vertical flips top<->bottom and keeps the column',
+    T.A11Y_CORNERS.every((c) => C.flipCorner(c, 'vertical') === expectV[c]))
+  check('flipping an axis twice returns to the start',
+    T.A11Y_CORNERS.every((c) => ['horizontal', 'vertical'].every((a) => C.flipCorner(C.flipCorner(c, a), a) === c)))
+  check('every move lands on a real corner',
+    T.A11Y_CORNERS.every((c) => ['horizontal', 'vertical'].every((a) => T.isA11yCorner(C.flipCorner(c, a)))))
+  check('all four corners are reachable from any one of them by arrow keys alone',
+    T.A11Y_CORNERS.every((start) => {
+      const seen = new Set([start])
+      const queue = [start]
+      while (queue.length) {
+        const c = queue.pop()
+        for (const a of ['horizontal', 'vertical']) {
+          const n = C.flipCorner(c, a)
+          if (!seen.has(n)) { seen.add(n); queue.push(n) }
+        }
+      }
+      return seen.size === 4
+    }))
+}
+
+// ── 6. lifecycle — hide / restore / toast, as a reducer ────────────────
+section('launcher lifecycle — transitions, and invariants under any event order')
+{
+  const { launcherReducer: step, INITIAL_LAUNCHER_STATE: init } = L
+  const run = (s, ...actions) => actions.reduce(step, s)
+  const live = run(init, { type: 'READY', firstVisit: true }, { type: 'ENTERED' })
+
+  check('starts pending: nothing to show before hydration', init.phase === 'pending' && init.toast === 'none' && !init.open)
+  check('events before READY are ignored (no launcher exists yet)',
+    JSON.stringify(run(init, { type: 'OPEN' }, { type: 'TOGGLE' }, { type: 'HIDE', focusToast: true }, { type: 'ENTERED' })) === JSON.stringify(init))
+
+  const first = step(init, { type: 'READY', firstVisit: true })
+  check('first visit enters with the FULL intro', first.phase === 'entering' && first.intro === 'full')
+  check('a returning visitor enters with the QUICK intro',
+    step(init, { type: 'READY', firstVisit: false }).intro === 'quick')
+  check('READY is idempotent (React StrictMode runs effects twice)',
+    step(first, { type: 'READY', firstVisit: false }) === first)
+  check('entering settles to visible', step(first, { type: 'ENTERED' }).phase === 'visible')
+
+  check('OPEN opens the panel', step(live, { type: 'OPEN' }).open === true)
+  check('F2 toggles the panel open then closed',
+    run(live, { type: 'TOGGLE' }).open === true && run(live, { type: 'TOGGLE' }, { type: 'TOGGLE' }).open === false)
+
+  const hiding = run(live, { type: 'OPEN' }, { type: 'HIDE', focusToast: true })
+  check('hide: outro starts, panel closes, toast comes in',
+    hiding.phase === 'leaving' && hiding.open === false && hiding.toast === 'in')
+  check('hide carries the focus hand-off flag', hiding.focusToast === true)
+  check('hiding twice is a no-op (the second click lands on a leaving button)',
+    step(hiding, { type: 'HIDE', focusToast: false }) === hiding)
+  check('a leaving launcher cannot be opened or toggled into an open state while leaving',
+    step(hiding, { type: 'OPEN' }).open === false)
+  check('the outro finishing leaves it hidden, toast still up',
+    run(hiding, { type: 'LEFT' }).phase === 'hidden' && run(hiding, { type: 'LEFT' }).toast === 'in')
+
+  const hidden = run(hiding, { type: 'LEFT' })
+  const viaF2 = step(hidden, { type: 'TOGGLE' })
+  check('F2 while hidden restores the launcher AND opens the panel',
+    viaF2.phase === 'entering' && viaF2.open === true)
+  check('a restore is always the QUICK intro, even after a first-visit full one',
+    viaF2.intro === 'quick' && hiding.intro === 'full')
+  check('restoring remounts the launcher (epoch bumps) so the entrance replays',
+    viaF2.epoch === hidden.epoch + 1)
+  check('restoring sends a toast that is still up on its way out', viaF2.toast === 'out')
+  const viaButton = step(hidden, { type: 'SHOW', focusLauncher: true })
+  check('the toast\'s button restores without opening the panel, and hands focus to the launcher',
+    viaButton.phase === 'entering' && viaButton.open === false && viaButton.focusLauncher === true)
+  check('F2 pressed mid-outro interrupts it and restores',
+    step(hiding, { type: 'TOGGLE' }).phase === 'entering' && step(hiding, { type: 'TOGGLE' }).open === true)
+  check('SHOW on a launcher that is already visible does nothing', step(live, { type: 'SHOW', focusLauncher: true }) === live)
+
+  const dismissed = step(hidden, { type: 'TOAST_DISMISS' })
+  check('dismissing the toast starts its exit; launcher stays hidden',
+    dismissed.toast === 'out' && dismissed.phase === 'hidden')
+  check('F2 still restores after the toast is gone — it is the way back',
+    step(run(dismissed, { type: 'TOAST_GONE' }), { type: 'TOGGLE' }).phase === 'entering')
+  check('TOAST_GONE only unmounts a toast that was leaving',
+    step(hidden, { type: 'TOAST_GONE' }) === hidden && run(dismissed, { type: 'TOAST_GONE' }).toast === 'none')
+  check('hiding again while the previous toast is still leaving brings a fresh one in',
+    step(run(viaButton, { type: 'ENTERED' }), { type: 'HIDE', focusToast: false }).toast === 'in')
+
+  // Random walk: fire a few thousand arbitrary sequences of events and check
+  // the four invariants after EVERY step, not just at the end. Seeded, so a
+  // failure is reproducible from the seed printed below.
+  const SEED = 0xa11c0de
+  let rng = SEED
+  const rand = () => {
+    rng |= 0; rng = (rng + 0x6d2b79f5) | 0
+    let t = Math.imul(rng ^ (rng >>> 15), 1 | rng)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+  const pick = (xs) => xs[Math.floor(rand() * xs.length)]
+  const ACTIONS = [
+    { type: 'READY', firstVisit: true }, { type: 'READY', firstVisit: false },
+    { type: 'OPEN' }, { type: 'CLOSE' }, { type: 'TOGGLE' },
+    { type: 'HIDE', focusToast: true }, { type: 'HIDE', focusToast: false },
+    { type: 'SHOW', focusLauncher: true }, { type: 'SHOW', focusLauncher: false },
+    { type: 'ENTERED' }, { type: 'LEFT' }, { type: 'TOAST_DISMISS' }, { type: 'TOAST_GONE' },
+  ]
+  const away = (p) => p === 'leaving' || p === 'hidden'
+  const interactive = (p) => p === 'entering' || p === 'visible'
+  let violation = ''
+  outer: for (let run_ = 0; run_ < 3000; run_++) {
+    let s = init
+    let leftPending = false
+    for (let i = 0; i < 40; i++) {
+      const a = pick(ACTIONS)
+      const next = step(s, a)
+      if (next.open && !interactive(next.phase)) { violation = `open while ${next.phase} after ${a.type}`; break outer }
+      if (next.toast === 'in' && !away(next.phase)) { violation = `toast in while ${next.phase} after ${a.type}`; break outer }
+      if (next.epoch < s.epoch) { violation = `epoch went backwards after ${a.type}`; break outer }
+      if (next.phase !== 'pending') leftPending = true
+      if (leftPending && next.phase === 'pending') { violation = `returned to pending after ${a.type}`; break outer }
+      s = next
+    }
+  }
+  check(`3000 random 40-event sequences hold all four invariants (seed 0x${SEED.toString(16)})`, violation === '', violation)
+
+  check('the toast stays up long enough to read (WCAG 2.2.1 spirit: >= 5s) and the outro is brief',
+    L.TOAST_VISIBLE_MS >= 5000 && L.LAUNCHER_LEAVE_MS > 0 && L.LAUNCHER_LEAVE_MS < 1000)
+  check('the entrance window covers the longest entrance, so FLIP never measures mid-pop',
+    L.LAUNCHER_ENTER_MS >= 1100)
 }
 
 // ── summary ────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import {
-  DEFAULT_A11Y_PREFS, FONT_SCALE_STEPS, SPACING_STEPS, CONTRAST_MODES,
-  type A11yPrefs, type FontScaleStep, type SpacingStep, type ContrastMode,
+  DEFAULT_A11Y_PREFS, DEFAULT_A11Y_UI, FONT_SCALE_STEPS, SPACING_STEPS, CONTRAST_MODES, isA11yCorner,
+  type A11yPrefs, type A11yUiState, type FontScaleStep, type SpacingStep, type ContrastMode,
 } from './types'
 
 /** Never throws, never trusts the input: every field is type- and
@@ -53,5 +53,46 @@ export function saveA11yPrefs(key: string, prefs: A11yPrefs): void {
   } catch {
     // Private browsing / storage full: the preference just doesn't survive
     // a reload. Not fatal — the widget still works for the rest of the visit.
+  }
+}
+
+// ── widget-UI state (corner choice, intro seen) ────────────────────────────
+//
+// Same discipline as the prefs above — never throws, never trusts the input —
+// but a separate blob under a separate key. The prefs key is the host's
+// (possibly legacy, migrated-from) one; the UI blob is derived from it so it
+// follows the host's namespace without ever colliding with the prefs value.
+
+export function a11yUiStorageKey(prefsKey: string): string {
+  return `${prefsKey}:ui`
+}
+
+export function sanitizeA11yUi(raw: unknown): A11yUiState {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_A11Y_UI }
+  const r = raw as Record<string, unknown>
+  return {
+    corner: isA11yCorner(r.corner) ? r.corner : DEFAULT_A11Y_UI.corner,
+    introSeen: typeof r.introSeen === 'boolean' ? r.introSeen : DEFAULT_A11Y_UI.introSeen,
+  }
+}
+
+export function loadA11yUi(key: string): A11yUiState {
+  if (typeof window === 'undefined') return { ...DEFAULT_A11Y_UI }
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return { ...DEFAULT_A11Y_UI }
+    return sanitizeA11yUi(JSON.parse(raw))
+  } catch {
+    return { ...DEFAULT_A11Y_UI }
+  }
+}
+
+export function saveA11yUi(key: string, ui: A11yUiState): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, JSON.stringify(ui))
+  } catch {
+    // Same as the prefs: not fatal. Worst case the launcher returns to its
+    // default corner and the intro plays once more on the next visit.
   }
 }

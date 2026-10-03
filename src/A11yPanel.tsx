@@ -1,10 +1,15 @@
 'use client'
 
-import { useCallback, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import A11ySheet from './internal/Sheet'
+import { withKey } from './internal/KeyHint'
 import { useA11y } from './A11yProvider'
 import { a11yT, type A11yUiKey } from './i18n'
-import { FONT_SCALE_STEPS, SPACING_STEPS, CONTRAST_MODES, QUICK_PROFILES, type ContrastMode, type Lang } from './types'
+import { flipCorner, type CornerAxis } from './corners'
+import {
+  A11Y_CORNERS, FONT_SCALE_STEPS, SPACING_STEPS, CONTRAST_MODES, QUICK_PROFILES,
+  type A11yCorner, type ContrastMode, type Lang,
+} from './types'
 
 // The control sheet, reorganized into the same category shape a visitor
 // already recognizes from commercial accessibility widgets: quick profiles
@@ -22,14 +27,41 @@ const CONTRAST_LABEL_KEY: Record<ContrastMode, 'contrastDefault' | 'contrastHigh
 
 const SPEECH_LANG: Record<Lang, string> = { he: 'he-IL', en: 'en-US', ar: 'ar-SA' }
 
-export default function A11yPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { prefs, set, patch, reset, lang, dir, config } = useA11y()
+const CORNER_LABEL_KEY: Record<A11yCorner, 'cornerTopLeft' | 'cornerTopRight' | 'cornerBottomLeft' | 'cornerBottomRight'> = {
+  'top-left': 'cornerTopLeft',
+  'top-right': 'cornerTopRight',
+  'bottom-left': 'cornerBottomLeft',
+  'bottom-right': 'cornerBottomRight',
+}
+
+// Physical axes, not "next/previous": the picker is laid out in physical
+// order whatever the page direction, so ← must never mean "forward" under RTL.
+const ARROW_AXIS: Record<string, CornerAxis> = {
+  ArrowLeft: 'horizontal', ArrowRight: 'horizontal', ArrowUp: 'vertical', ArrowDown: 'vertical',
+}
+
+export default function A11yPanel({
+  open, onClose, onHide, restoreFocus,
+}: {
+  open: boolean
+  onClose: () => void
+  /** Hides the launcher. When omitted the "Hide this button" control is not
+   *  rendered — a host composing the pieces by hand opts in explicitly. */
+  onHide?: () => void
+  /** Passed straight to the sheet. See A11ySheet. */
+  restoreFocus?: boolean
+}) {
+  const { prefs, set, patch, reset, lang, dir, config, corner, setCorner } = useA11y()
   const t = useCallback((k: A11yUiKey) => a11yT(k, lang), [lang])
   const haptic = config.onHaptic ?? (() => {})
   const [announcement, setAnnouncement] = useState('')
+  // The hide control's name and description are two separate nodes, wired up
+  // with aria-labelledby/-describedby, so the accessible name stays "Hide this
+  // button" instead of swallowing the whole hint sentence.
+  const hideId = useId()
 
   return (
-    <A11ySheet open={open} onClose={onClose} label={t('title')} dir={dir}>
+    <A11ySheet open={open} onClose={onClose} label={t('title')} dir={dir} restoreFocus={restoreFocus}>
       <div className="a11yw-scroll" style={{ gap: 18, paddingTop: 6 }}>
         <div>
           <h2 style={{ margin: '0 0 4px', fontSize: '1.05rem', fontWeight: 800, color: 'var(--a11y-text, var(--text, #f5f3ef))' }}>
@@ -115,6 +147,14 @@ export default function A11yPanel({ open, onClose }: { open: boolean; onClose: (
         <Section title={t('toolsSection')}>
           <ReadSelectionTool lang={lang} onAnnounce={setAnnouncement} />
         </Section>
+
+        <Section title={t('positionSection')}>
+          <CornerPicker
+            value={corner}
+            lang={lang}
+            onChange={(c) => { if (c !== corner) { haptic('select'); setCorner(c) } }}
+          />
+        </Section>
       </div>
 
       <div style={{ paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -126,6 +166,31 @@ export default function A11yPanel({ open, onClose }: { open: boolean; onClose: (
             {t('close')}
           </button>
         </div>
+        {/* Pinned here rather than in the scrolling body: a visitor who opens
+            this panel because the button is in the way is looking for exactly
+            this, and it must not be a scroll away on a long panel. The hint
+            sits INSIDE the button so the way back is read before the choice
+            is made, not only after. */}
+        {onHide && (
+          <button
+            type="button"
+            className="a11yw-btn-ghost a11yw-press"
+            onClick={() => { haptic('select'); onHide() }}
+            aria-labelledby={`${hideId}-label`}
+            aria-describedby={`${hideId}-hint`}
+          >
+            <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flex: '0 0 auto' }}>
+              <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" />
+              <circle cx="12" cy="12" r="3" />
+              <path d="M4 4l16 16" />
+            </svg>
+            <span className="a11yw-btn-ghost-text">
+              <span id={`${hideId}-label`} className="a11yw-btn-ghost-label">{t('hideButton')}</span>
+              <span id={`${hideId}-hint`} className="a11yw-btn-ghost-hint">{withKey(t('hideHint'))}</span>
+            </span>
+          </button>
+        )}
         {config.statementHref && (
           <a
             href={config.statementHref}
@@ -185,6 +250,66 @@ function ReadSelectionTool({ lang, onAnnounce }: { lang: Lang; onAnnounce: (msg:
     >
       {speaking ? a11yT('stopReading', lang) : a11yT('readSelection', lang)}
     </button>
+  )
+}
+
+/** A 2×2 radiogroup drawn as a miniature screen with a target in each corner —
+ *  the shape of the thing being chosen, so it needs no reading to understand.
+ *
+ *  Laid out in PHYSICAL order (`direction: ltr` in the CSS) however the page
+ *  reads: top-left must be at the top left of the preview under RTL too, the
+ *  same rule the launcher follows. Roving tabindex: the checked corner is the
+ *  one tab stop, and the arrow keys move between corners (see ARROW_AXIS). */
+function CornerPicker({
+  value, onChange, lang,
+}: {
+  value: A11yCorner; onChange: (c: A11yCorner) => void; lang: Lang
+}) {
+  const refs = useRef<Partial<Record<A11yCorner, HTMLButtonElement | null>>>({})
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const axis = ARROW_AXIS[e.key]
+    if (!axis) return
+    e.preventDefault()
+    const next = flipCorner(value, axis)
+    onChange(next)
+    refs.current[next]?.focus()
+  }
+
+  return (
+    <div className="a11yw-corner-picker">
+      <div role="radiogroup" aria-label={a11yT('positionGroup', lang)} className="a11yw-corners" onKeyDown={onKeyDown}>
+        <span className="a11yw-corners-screen" aria-hidden />
+        {A11Y_CORNERS.map((c) => {
+          const active = c === value
+          return (
+            <button
+              key={c}
+              ref={(el) => { refs.current[c] = el }}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              tabIndex={active ? 0 : -1}
+              aria-label={a11yT(CORNER_LABEL_KEY[c], lang)}
+              className={`a11yw-corner a11yw-corner-${c} a11yw-press`}
+              onClick={() => onChange(c)}
+            >
+              <span className="a11yw-corner-dot" aria-hidden>
+                <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor"
+                  strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v1M9 12h6M12 12v5" />
+                </svg>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      {/* A visible caption for the sighted, who would otherwise have to infer
+          the choice from the dot alone. aria-hidden: the checked radio already
+          announces its own name. */}
+      <p className="a11yw-corner-caption" aria-hidden>{a11yT(CORNER_LABEL_KEY[value], lang)}</p>
+    </div>
   )
 }
 
