@@ -19,15 +19,20 @@ palette if the host defines none). Peer dependencies are only `react` and
 
 ## Install
 
-Add it as a git dependency, pinned to a tag:
+Add it as a dependency pinned to a release tag. Both consuming apps
+(AyekaBar, Sarcafe-Portal) use the tarball URL form, which npm fetches over
+plain HTTPS with no git involved:
 
 ```json
 {
   "dependencies": {
-    "a11y-widget": "github:unixecho/a11y-widget#v1.0.0"
+    "a11y-widget": "https://github.com/unixecho/a11y-widget/archive/refs/tags/v1.1.0.tar.gz"
   }
 }
 ```
+
+(`github:unixecho/a11y-widget#v1.1.0` resolves to the same code wherever git
+is available.)
 
 Then in `next.config.js`/`next.config.mjs`, tell Next to transpile it (it
 ships TypeScript/TSX source, not a pre-built bundle):
@@ -40,8 +45,8 @@ const nextConfig = {
 ```
 
 To pick up a later version, bump the tag in `package.json` and reinstall
-(`npm install`). There is no publish step and no registry — GitHub is the
-registry.
+(`npm install`) — which also refreshes `package-lock.json`, so commit both.
+There is no publish step and no registry — GitHub is the registry.
 
 ## Integration contract
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 — 2026-10-03
 
 - **Hide the button, and a quick way back.** A "Hide this button" control,
   pinned to the foot of the panel, hides the launcher. It plays an outro, then
