@@ -6,6 +6,7 @@ import A11yLauncher from './A11yLauncher'
 import A11yPanel from './A11yPanel'
 import A11yToast from './A11yToast'
 import ReadingGuide from './ReadingGuide'
+import { isKeyboardFocus } from './internal/focus'
 import { usePrefersReducedMotion } from './internal/motion'
 import {
   INITIAL_LAUNCHER_STATE, LAUNCHER_ENTER_MS, LAUNCHER_LEAVE_MS, launcherReducer,
@@ -85,11 +86,17 @@ function A11yWidgetInner() {
   const open = useCallback(() => dispatch({ type: 'OPEN' }), [])
   const close = useCallback(() => dispatch({ type: 'CLOSE' }), [])
   const hide = useCallback(() => {
-    // If the hide came from inside the panel, the visitor's focus is about to
+    // If a KEYBOARD visitor hid it from inside the panel, their focus is about to
     // vanish with it — the toast's button takes it instead of <body> getting it.
+    //
+    // "Keyboard" matters: the panel moves focus to its first control by script
+    // the moment it opens, so after a TAP `document.activeElement` is still in
+    // the panel even though no keyboard is involved. Treating that as keyboard
+    // handed the toast focus it had no use for — and a focused toast holds its
+    // own dismiss clock, so on a phone it never closed (1.1.0, found live).
     const active = document.activeElement
     const fromPanel = active instanceof HTMLElement && active.closest('.a11yw-panel') !== null
-    dispatch({ type: 'HIDE', focusToast: fromPanel })
+    dispatch({ type: 'HIDE', focusToast: fromPanel && isKeyboardFocus(active) })
   }, [])
   const restore = useCallback(() => dispatch({ type: 'SHOW', focusLauncher: true }), [])
   const dismissToast = useCallback(() => dispatch({ type: 'TOAST_DISMISS' }), [])

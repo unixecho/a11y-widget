@@ -27,10 +27,35 @@
  *  settled — FLIP never measures a launcher that is still mid-pop. */
 export const LAUNCHER_ENTER_MS = 1200
 export const LAUNCHER_LEAVE_MS = 380
-/** Long enough to read a title, a hint and a second hint without rushing;
- *  hover/focus pauses it, and a toast that holds focus never times out. */
-export const TOAST_VISIBLE_MS = 10_000
+/** How long the toast stays before it closes ITSELF — with a countdown ring on
+ *  its close button, so the visitor can see it coming (the way Waze's prompts
+ *  do). 1.1.0 used 10s and, worse, froze the clock on any focus, so a toast
+ *  opened by a tap never closed at all; 5s is enough to read the title and the
+ *  way back, and the clock is held only while the visitor is actually engaging
+ *  with it (see `toastHeld`), which is what keeps a short timer honest under
+ *  WCAG 2.2.1 (Timing Adjustable). Must stay >= 5000 — the harness holds it. */
+export const TOAST_VISIBLE_MS = 5_000
 export const TOAST_LEAVE_MS = 220
+
+/** What the visitor is doing to the toast right now. */
+export interface ToastEngagement {
+  /** A MOUSE is over it. Deliberately not "any pointer is over it": on touch,
+   *  `pointerenter` fires for the tap and no hover ever ends, so counting it
+   *  would freeze the clock for every touch visitor. */
+  mouseOver: boolean
+  /** A pointer of any kind is held DOWN on it — touch-and-hold keeps it open,
+   *  the way a story pauses under a finger. Released = the clock resumes. */
+  pressed: boolean
+  /** Focus is inside it AND is keyboard focus (`isKeyboardFocus`). Focus that
+   *  the page moved there on its own does not count. */
+  keyboardFocus: boolean
+}
+
+/** Does the visitor's engagement hold the dismiss clock? Pure, so the rule that
+ *  decides whether a touch visitor's toast ever closes is under test. */
+export function toastHeld(e: ToastEngagement): boolean {
+  return e.mouseOver || e.pressed || e.keyboardFocus
+}
 
 // ── state ─────────────────────────────────────────────────────────────────
 

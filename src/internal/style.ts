@@ -381,7 +381,7 @@ html.a11y-readable-font * {
   position: relative; overflow: hidden; box-sizing: border-box; width: 100%;
   pointer-events: auto;
   display: flex; flex-direction: column; gap: 10px;
-  padding: 14px 14px 18px;
+  padding: 14px;
   border-radius: 18px;
   background: var(--a11y-bg-elev, var(--bg-elev-2, #1d1d2b));
   color: var(--a11y-text, var(--text, #f5f3ef));
@@ -420,6 +420,7 @@ html.a11y-readable-font * {
 /* A 44px target tucked into the card's corner with negative margins, so the
    card stays compact without the dismiss control being fiddly. */
 .a11yw-toast-close {
+  position: relative;
   flex: 0 0 auto; width: 44px; height: 44px; margin: -8px; margin-inline-start: 0;
   display: grid; place-items: center; padding: 0;
   border: 0; border-radius: 999px; background: transparent;
@@ -447,25 +448,36 @@ html.a11y-readable-font * {
   outline: 2px solid var(--a11y-text, var(--text, #f5f3ef)); outline-offset: 2px;
 }
 
-/* The time left, drawn as a line that drains. Decoration only — the dismiss
+/* The time left, drawn as a RING around the close button that drains — the way
+   Waze's prompts count down — so the visitor can see the toast is about to
+   close itself and that the X is the way to do it sooner. (1.1.0 had a 3px line
+   along the bottom edge that nobody noticed.) Decoration only: the dismiss
    clock is JS (see A11yToast), so this can be flattened by "Pause animations"
-   or reduced motion without the toast vanishing early. */
-.a11yw-toast-timer {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
-  background: linear-gradient(90deg, var(--a11y-accent, var(--neon, #ff5e3a)), var(--a11y-accent-soft, var(--neon-soft, #ff8a5c)));
-  transform-origin: 0 50%;
-  animation: a11yw-toast-timer var(--a11yw-toast-ms, 10s) linear forwards;
+   or reduced motion without the toast vanishing early. It freezes in step with
+   the clock while the visitor is engaging with the toast (data-paused).
+   r=19 in a 44-unit box: circumference 2*pi*19 = 119.38. */
+.a11yw-toast-ring {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  transform: rotate(-90deg); /* start at 12 o'clock */
+  pointer-events: none; overflow: visible;
 }
-.a11yw-toast[data-paused='true'] .a11yw-toast-timer { animation-play-state: paused; }
-@keyframes a11yw-toast-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.a11yw-toast-ring circle { fill: none; stroke-width: 2.5; }
+.a11yw-toast-ring-track { stroke: rgba(255, 255, 255, 0.10); }
+.a11yw-toast-ring-fill {
+  stroke: var(--a11y-accent, var(--neon, #ff5e3a)); stroke-linecap: round;
+  stroke-dasharray: 119.4; stroke-dashoffset: 0;
+  animation: a11yw-toast-ring var(--a11yw-toast-ms, 5s) linear forwards;
+}
+.a11yw-toast[data-paused='true'] .a11yw-toast-ring-fill { animation-play-state: paused; }
+@keyframes a11yw-toast-ring { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 119.4; } }
 
-/* Reduce: it just appears and goes. The drain line is dropped — it is the
-   one part that is motion and nothing else. */
+/* Reduce: it just appears and goes. The ring is dropped — it is the one part
+   that is motion and nothing else. */
 @media (prefers-reduced-motion: reduce) {
   .a11yw-toast { animation: none !important; }
-  .a11yw-toast-timer { display: none; }
+  .a11yw-toast-ring { display: none; }
 }
-html.a11y-motion-off .a11yw-toast-timer { display: none; }
+html.a11y-motion-off .a11yw-toast-ring { display: none; }
 /* No F2 key on a touch-only device — the button below is the way back. */
 @media (hover: none) and (pointer: coarse) {
   .a11yw-toast-keyhint { display: none; }

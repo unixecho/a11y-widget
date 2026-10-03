@@ -441,8 +441,69 @@ section('launcher lifecycle — transitions, and invariants under any event orde
 
   check('the toast stays up long enough to read (WCAG 2.2.1 spirit: >= 5s) and the outro is brief',
     L.TOAST_VISIBLE_MS >= 5000 && L.LAUNCHER_LEAVE_MS > 0 && L.LAUNCHER_LEAVE_MS < 1000)
+  check('…but it closes ITSELF quickly — no longer than 6s (1.1.0 used 10s, and never closed at all after a tap)',
+    L.TOAST_VISIBLE_MS <= 6000)
   check('the entrance window covers the longest entrance, so FLIP never measures mid-pop',
     L.LAUNCHER_ENTER_MS >= 1100)
+}
+
+// ── 7. the toast's clock — what may hold it ────────────────────────────
+//
+// 1.1.0 held the clock on ANY focus, and hiding the button from the panel moved
+// focus onto the toast by script after a TAP — so on a phone the toast froze its
+// own timer and never closed until the visitor pressed X. These pin the rule
+// that fixed it.
+section('toast — what holds the dismiss clock')
+{
+  const none = { mouseOver: false, pressed: false, keyboardFocus: false }
+  check('nothing happening: the clock runs and the toast closes itself', L.toastHeld(none) === false)
+  check('a MOUSE over it holds the clock (WCAG 2.2.1)', L.toastHeld({ ...none, mouseOver: true }) === true)
+  check('a pointer pressed and HELD on it keeps it open — touch-and-hold, like a story',
+    L.toastHeld({ ...none, pressed: true }) === true)
+  check('KEYBOARD focus inside it holds the clock — it never times out from under a keyboard user',
+    L.toastHeld({ ...none, keyboardFocus: true }) === true)
+  check('any combination of the three holds it', [true, false].every((a) => [true, false].every((b) => [true, false].every((c) =>
+    L.toastHeld({ mouseOver: a, pressed: b, keyboardFocus: c }) === (a || b || c)))))
+
+  // The three that must NOT hold it are properties of how the component reads
+  // the browser, which the pure rule cannot see — so they are pinned at the
+  // source, where a regression would have to appear.
+  const toast = readFileSync(new URL('A11yToast.tsx', SRC), 'utf8')
+  const widget = readFileSync(new URL('A11yWidget.tsx', SRC), 'utf8')
+  const focus = readFileSync(new URL('internal/focus.ts', SRC), 'utf8')
+  const css = readFileSync(new URL('internal/style.ts', SRC), 'utf8')
+  const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const toastCode = code(toast)
+
+  check('touch "hover" never holds it: pointerenter/leave count only for a MOUSE',
+    /onPointerEnter=\{\(e\) => \{ if \(e\.pointerType === 'mouse'\) setMouseOver\(true\) \}\}/.test(toastCode)
+    && /onPointerLeave=\{\(e\) => \{ if \(e\.pointerType === 'mouse'\) setMouseOver\(false\) \}\}/.test(toastCode))
+  check('focus holds it only if it is KEYBOARD focus (:focus-visible), recomputed on every focus change',
+    /onFocus=\{\(e\) => setKeyboardFocus\(isKeyboardFocus\(e\.target as Element\)\)\}/.test(toastCode))
+  check('the 1.1.0 behaviour — ANY focus holds it — is gone', !/setFocused\(true\)/.test(toastCode) && !/\bhovered\b/.test(toastCode))
+  check('a press is released wherever the finger lets go (window listeners, cleaned up on unmount)',
+    /addEventListener\('pointerup'/.test(toastCode) && /addEventListener\('pointercancel'/.test(toastCode)
+    && /useEffect\(\(\) => \(\) => releasePress\.current\?\.\(\), \[\]\)/.test(toastCode))
+  check('the isKeyboardFocus helper asks the browser (:focus-visible) and fails to "keyboard" where it cannot — the safe side',
+    /matches\(':focus-visible'\)/.test(focus) && /catch \{\s*return true/.test(focus))
+  check('hiding from the panel hands the toast focus ONLY to a keyboard visitor — what the README always promised',
+    /focusToast: fromPanel && isKeyboardFocus\(active\)/.test(code(widget)))
+
+  // The countdown.
+  check('the toast shows a countdown ring on the close button, and the old 3px line is gone',
+    /a11yw-toast-ring-fill/.test(toastCode) && !/a11yw-toast-timer/.test(toastCode) && !/a11yw-toast-timer/.test(css))
+  const circumference = 2 * Math.PI * 19
+  const dash = Number((css.match(/stroke-dasharray:\s*([\d.]+)/) || [])[1])
+  const offset = Number((css.match(/to \{ stroke-dashoffset:\s*([\d.]+)/) || [])[1])
+  check(`the ring's dash length matches its radius (2πr = ${circumference.toFixed(2)})`,
+    Math.abs(dash - circumference) < 0.1 && Math.abs(offset - circumference) < 0.1, `dasharray ${dash}, end offset ${offset}`)
+  check('the ring drains over exactly the toast\'s life, and freezes with the clock',
+    /animation: a11yw-toast-ring var\(--a11yw-toast-ms, 5s\) linear forwards/.test(css)
+    && /\.a11yw-toast\[data-paused='true'\] \.a11yw-toast-ring-fill \{ animation-play-state: paused; \}/.test(css)
+    && /--a11yw-toast-ms/.test(toast))
+  check('the ring is hidden — and the clock keeps running — under reduced motion and "Pause animations"',
+    /prefers-reduced-motion: reduce\) \{[\s\S]*?\.a11yw-toast-ring \{ display: none; \}/.test(css)
+    && /html\.a11y-motion-off \.a11yw-toast-ring \{ display: none; \}/.test(css))
 }
 
 // ── summary ────────────────────────────────────────────────────────────

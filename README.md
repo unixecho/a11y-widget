@@ -26,12 +26,12 @@ plain HTTPS with no git involved:
 ```json
 {
   "dependencies": {
-    "a11y-widget": "https://github.com/unixecho/a11y-widget/archive/refs/tags/v1.1.0.tar.gz"
+    "a11y-widget": "https://github.com/unixecho/a11y-widget/archive/refs/tags/v1.1.1.tar.gz"
   }
 }
 ```
 
-(`github:unixecho/a11y-widget#v1.1.0` resolves to the same code wherever git
+(`github:unixecho/a11y-widget#v1.1.1` resolves to the same code wherever git
 is available.)
 
 Then in `next.config.js`/`next.config.mjs`, tell Next to transpile it (it
@@ -129,8 +129,13 @@ lives in the panel and needs no host configuration.
   launcher. It plays a short outro (drawn back into its corner) and a toast
   appears in the same corner explaining the three ways back: press **F2**, press
   the toast's *Bring it back* button, or just refresh the page. The toast
-  stays for 10 seconds, pauses while it is hovered or holds focus, and takes
-  keyboard focus when the hide was done from the keyboard.
+  **closes itself after 5 seconds**, with a countdown ring on its close button
+  so the visitor can see it coming. The clock is held (WCAG 2.2.1) only while the
+  visitor is actually engaging: a **mouse** over it, a pointer **pressed and
+  held** on it (touch-and-hold), or **keyboard** focus inside it. Touch "hover"
+  and focus the page moved there on its own do not hold it. A **keyboard**
+  visitor who hid the button from the panel gets focus on the toast's button
+  (so they don't lose their place); a visitor who tapped or clicked does not.
   - Only the *button* is hidden. Every adjustment the visitor chose (text size,
     contrast, reading guide…) stays applied.
   - **Hiding is deliberately not remembered across reloads.** A hide that

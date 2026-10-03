@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.1.1 — 2026-10-03
+
+A fix to the 1.1.0 toast, found by the first real visitor to use it on a phone.
+
+- **Fix: the toast never closed by itself.** Hiding the button from the panel
+  moved keyboard focus onto the toast's *Bring it back* button by script — after
+  a **tap** — and the toast treated *any* focus as "the visitor is reading me,
+  hold the clock". So on a phone the 10-second timer (and its progress line)
+  froze on frame zero and the toast stayed until the visitor pressed X. The
+  README had always said the toast takes focus "when the hide was done from the
+  keyboard"; the code took it for every hide from inside the panel.
+  - The clock is now held only by genuine engagement (`toastHeld`, exported from
+    `lifecycle.ts`, pure and tested): a **mouse** over the toast, a pointer
+    **pressed and held** on it (touch-and-hold keeps it open, like a story), or
+    **keyboard** focus inside it (`:focus-visible`). Touch "hover" — which never
+    ends — and focus the page moved there itself no longer count. WCAG 2.2.1
+    (Timing Adjustable) is kept for the visitors it is for.
+  - Hiding from the panel hands the toast focus **only to a keyboard visitor**
+    (`isKeyboardFocus`, new in `internal/focus.ts`). A tap or click does not.
+- **The toast closes itself after 5 seconds** (was 10; `TOAST_VISIBLE_MS`). The
+  harness holds it between 5s and 6s.
+- **A countdown ring on the close button** replaces the 3px line along the
+  bottom edge, which nobody noticed: it drains over the toast's life, the way a
+  navigation app's prompts do, and freezes with the clock. Hidden — with the JS
+  clock still running — under reduced motion and "Pause animations".
+  (`.a11yw-toast-timer` is gone; hosts targeting it should use
+  `.a11yw-toast-ring-fill`.)
+- 16 new harness checks (120 total), including that the two original defects
+  — focus after any panel interaction, touch counted as hover — fail the
+  harness when reintroduced.
+
 ## 1.1.0 — 2026-10-03
 
 - **Hide the button, and a quick way back.** A "Hide this button" control,

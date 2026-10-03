@@ -6,7 +6,8 @@ import { withKey } from './internal/KeyHint'
 import { usePrefersReducedMotion } from './internal/motion'
 import { useA11y } from './A11yProvider'
 import { a11yT } from './i18n'
-import { TOAST_LEAVE_MS, TOAST_VISIBLE_MS, type ToastPhase } from './lifecycle'
+import { isKeyboardFocus } from './internal/focus'
+import { TOAST_LEAVE_MS, TOAST_VISIBLE_MS, toastHeld, type ToastPhase } from './lifecycle'
 import type { A11yCorner } from './types'
 
 // The notification shown after the launcher is hidden: what happened, and the
@@ -17,13 +18,21 @@ import type { A11yCorner } from './types'
 // visitor's eye is already there — the outro and this are one gesture.
 //
 // Timing, all of it deliberate:
-//   • It auto-dismisses after TOAST_VISIBLE_MS, but hovering it or focusing
-//     anything in it PAUSES the clock (WCAG 2.2.1 Timing Adjustable) — a toast
-//     that holds focus never times out from under a keyboard user.
+//   • It closes ITSELF after TOAST_VISIBLE_MS (5s), with a countdown ring on
+//     its close button so the visitor can see it coming. Nobody should have to
+//     press X to get rid of a notice that only says "I moved".
+//   • The clock is held — WCAG 2.2.1 Timing Adjustable — only while the visitor
+//     is genuinely ENGAGING (see `toastHeld`): a MOUSE over it, a pointer
+//     pressed and held on it (touch-and-hold, like a story), or KEYBOARD focus
+//     inside it (`:focus-visible`). It is NOT held by touch "hover" (a tap
+//     fires pointerenter and no hover ever ends) nor by focus the page moved
+//     there on its own. 1.1.0 held it on any focus at all, and hiding the
+//     button from the panel moved focus here by script — so a toast opened by a
+//     TAP froze its own clock and never closed. Found live, 2026-10-03.
 //   • The timers are JS, never `animationend`: the visitor may have switched
 //     on "Pause animations", which sets every animation to ~0ms, and a toast
-//     that dismissed itself the instant its progress bar "finished" would
-//     vanish before it could be read. The bar is decoration; the clock is JS.
+//     that dismissed itself the instant its ring "finished" would vanish
+//     before it could be read. The ring is decoration; the clock is JS.
 
 const REGION_CLASS: Record<A11yCorner, string> = {
   'top-left': 'a11yw-toast-tl',
@@ -67,9 +76,32 @@ export default function A11yToast(props: A11yToastProps) {
 function Toast({ phase, onRestore, onDismiss, onGone, autoFocus = false }: A11yToastProps) {
   const { lang, prefs } = useA11y()
   const skipMotion = usePrefersReducedMotion() || prefs.pauseAnimations
-  const [hovered, setHovered] = useState(false)
-  const [focused, setFocused] = useState(false)
-  const paused = hovered || focused
+  const [mouseOver, setMouseOver] = useState(false)
+  const [pressed, setPressed] = useState(false)
+  const [keyboardFocus, setKeyboardFocus] = useState(false)
+  const paused = toastHeld({ mouseOver, pressed, keyboardFocus })
+
+  // A press ends wherever the finger or button is RELEASED, not only over the
+  // toast — so the release is listened for on the window, and cleaned up if the
+  // toast goes away mid-press.
+  const releasePress = useRef<(() => void) | null>(null)
+  useEffect(() => () => releasePress.current?.(), [])
+  const onPointerDown = () => {
+    releasePress.current?.()
+    setPressed(true)
+    const end = () => {
+      setPressed(false)
+      window.removeEventListener('pointerup', end, true)
+      window.removeEventListener('pointercancel', end, true)
+      releasePress.current = null
+    }
+    window.addEventListener('pointerup', end, true)
+    window.addEventListener('pointercancel', end, true)
+    releasePress.current = () => {
+      window.removeEventListener('pointerup', end, true)
+      window.removeEventListener('pointercancel', end, true)
+    }
+  }
 
   // The callbacks are read through refs so a parent passing fresh inline
   // functions every render cannot restart the clock.
@@ -126,12 +158,16 @@ function Toast({ phase, onRestore, onDismiss, onGone, autoFocus = false }: A11yT
       data-paused={paused || undefined}
       style={{ '--a11yw-toast-ms': `${TOAST_VISIBLE_MS}ms` } as CSSProperties}
       onKeyDown={onKeyDown}
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
-      onFocus={() => setFocused(true)}
+      onPointerDown={onPointerDown}
+      // Mouse only: see the header — on touch, "hover" never ends.
+      onPointerEnter={(e) => { if (e.pointerType === 'mouse') setMouseOver(true) }}
+      onPointerLeave={(e) => { if (e.pointerType === 'mouse') setMouseOver(false) }}
+      // Recomputed on every focus change, so moving between the toast's own
+      // buttons re-asks "is this the keyboard?" each time.
+      onFocus={(e) => setKeyboardFocus(isKeyboardFocus(e.target as Element))}
       onBlur={(e) => {
         // Focus moving between the toast's own buttons is not leaving it.
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false)
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setKeyboardFocus(false)
       }}
     >
       <div className="a11yw-toast-head">
@@ -152,6 +188,12 @@ function Toast({ phase, onRestore, onDismiss, onGone, autoFocus = false }: A11yT
           onClick={onDismiss}
           aria-label={a11yT('toastDismiss', lang)}
         >
+          {/* The countdown: a ring around the button that drains over the toast's
+              life. Decoration only (aria-hidden) — the clock is the JS timer. */}
+          <svg className="a11yw-toast-ring" viewBox="0 0 44 44" aria-hidden>
+            <circle className="a11yw-toast-ring-track" cx="22" cy="22" r="19" />
+            <circle className="a11yw-toast-ring-fill" cx="22" cy="22" r="19" />
+          </svg>
           <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor"
             strokeWidth={2} strokeLinecap="round" aria-hidden>
             <path d="M6 6l12 12M18 6L6 18" />
@@ -192,8 +234,6 @@ function Toast({ phase, onRestore, onDismiss, onGone, autoFocus = false }: A11yT
           {a11yT('toastRestore', lang)}
         </button>
       </div>
-
-      <span className="a11yw-toast-timer" aria-hidden />
     </div>
   )
 }

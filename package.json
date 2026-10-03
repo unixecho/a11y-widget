@@ -1,6 +1,6 @@
 {
   "name": "a11y-widget",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Shared, portable in-house accessibility widget (floating launcher + preferences panel) for unixecho's customer-facing sites. Zero host-app dependencies.",
   "private": false,
   "license": "UNLICENSED",
