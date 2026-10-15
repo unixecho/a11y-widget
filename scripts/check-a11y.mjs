@@ -666,7 +666,7 @@ section('placement — the launcher takes the nearest free corner')
   check('what cannot be seen or tapped does not count', /pointerEvents === 'none'/.test(avoid) && /visibility === 'hidden'/.test(avoid))
   check('it looks again when the page changes, resizes, scrolls or finishes an animation',
     ['MutationObserver', "'resize'", "'scroll'", "'transitionend'", "'animationend'"].every((k) => avoid.includes(k)))
-  check('a zero-size viewport (hidden tab or pane) is ignored rather than scattering the launcher', /viewport.width <= 0 || viewport.height <= 0) return/.test(avoid))
+  check('a zero-size viewport (hidden tab or pane) is ignored rather than scattering the launcher', /viewport\.width <= 0 \|\| viewport\.height <= 0\) return/.test(avoid))
   check('a corner worked out for an OLD choice is never shown for the new one (no glide to the wrong place)',
     /placed\.for === preferred \? placed\.corner : preferred/.test(avoid))
   check('the launcher is given the avoiding corner', /corner=\{placedCorner\}/.test(code(readFileSync(new URL('A11yWidget.tsx', SRC), 'utf8'))))
