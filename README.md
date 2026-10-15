@@ -26,12 +26,12 @@ plain HTTPS with no git involved:
 ```json
 {
   "dependencies": {
-    "a11y-widget": "https://github.com/unixecho/a11y-widget/archive/refs/tags/v1.2.0.tar.gz"
+    "a11y-widget": "https://github.com/unixecho/a11y-widget/archive/refs/tags/v1.2.1.tar.gz"
   }
 }
 ```
 
-(`github:unixecho/a11y-widget#v1.2.0` resolves to the same code wherever git
+(`github:unixecho/a11y-widget#v1.2.1` resolves to the same code wherever git
 is available.)
 
 Then in `next.config.js`/`next.config.mjs`, tell Next to transpile it (it

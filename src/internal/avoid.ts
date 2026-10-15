@@ -120,6 +120,11 @@ export function useAvoidingCorner(
     const look = () => {
       timer = 0
       const viewport = { width: document.documentElement.clientWidth || window.innerWidth, height: window.innerHeight }
+      // A viewport with no size (a hidden tab or pane, a page mid-teardown) has no
+      // corners to compare: every control would "overlap" every corner and the
+      // launcher would be thrown at an arbitrary one. Keep where it is; the resize
+      // that gives the viewport its size looks again.
+      if (viewport.width <= 0 || viewport.height <= 0) return
       const blockers = collectBlockers(viewport, readInsets(probe), namedRef.current)
       const corner = pickCorner(preferred, blockers, viewport, readInsets(probe))
       setPlaced((prev) => (prev.for === preferred && prev.corner === corner ? prev : { for: preferred, corner }))

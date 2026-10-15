@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 — 2026-10-15
+
+- **Fix: the launcher is no longer thrown at a random corner when the viewport has no size** (a hidden tab or pane reports 0×0, and then every control "overlaps" every corner). It now keeps where it is and looks again on the next resize. Found by checking the live site from a hidden browser pane.
+
 ## 1.2.0 — 2026-10-15
 
 Two things the owner asked for: the button must never sit on top of the site's
