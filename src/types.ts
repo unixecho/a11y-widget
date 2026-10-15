@@ -104,9 +104,14 @@ export interface A11yUiState {
   corner: A11yCorner | null
   /** True once the full first-visit intro has played on this device. */
   introSeen: boolean
+  /** The visitor turned the widget OFF. Unlike hiding the button (memory only,
+   *  back on refresh), this IS persisted: the widget stays off on every later
+   *  load until it is turned on again — from the host's locale (globe) button,
+   *  or with the shortcut key. See lifecycle.ts. */
+  disabled: boolean
 }
 
-export const DEFAULT_A11Y_UI: A11yUiState = { corner: null, introSeen: false }
+export const DEFAULT_A11Y_UI: A11yUiState = { corner: null, introSeen: false, disabled: false }
 
 /** A one-tap COMPOSITION of the real prefs above — never a capability that
  *  doesn't otherwise exist in this widget. Modelled on the "quick profiles"
@@ -205,7 +210,28 @@ export interface A11yWidgetConfig {
    *  controls, has one tap to get there. Omitted entirely (no link shown)
    *  when not set, rather than guessing at a route that might not exist. */
   statementHref?: string
+  /** CSS selector(s) for the host's locale (globe) button. The launcher never
+   *  covers it, and it is where the widget is turned back on once the visitor
+   *  has switched it off: a menu item is added to the menu it opens, and a hint
+   *  appears beside it on every load. Defaults to `DEFAULT_LOCALE_SELECTORS`. */
+  localeButton?: string | string[]
+  /** Extra CSS selector(s) for elements the launcher must never cover, on top
+   *  of what it finds by itself: every visible button or link that is fixed or
+   *  sticky (back, cart, tab bars…) and anything carrying `data-a11y-avoid`. */
+  avoid?: string | string[]
 }
+
+/** Where the locale (globe) button is looked for when the host does not say.
+ *  The first is the portal's fixed globe (`#main > div > button`), narrowed to
+ *  buttons that open a menu so an unrelated button at that depth is never
+ *  mistaken for it; the rest match the globe by its accessible name, which both
+ *  current hosts set in all three languages. */
+export const DEFAULT_LOCALE_SELECTORS: readonly string[] = [
+  '#main > div > button[aria-haspopup="menu"]',
+  'button[aria-haspopup="menu"][aria-label="שינוי שפה"]',
+  'button[aria-haspopup="menu"][aria-label="Change language"]',
+  'button[aria-haspopup="menu"][aria-label="تغيير اللغة"]',
+]
 
 export const DEFAULT_A11Y_CONFIG: Required<Pick<A11yWidgetConfig, 'corner' | 'storageKey' | 'defaultLang'>> = {
   corner: 'bottom-right',

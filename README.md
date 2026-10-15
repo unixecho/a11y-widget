@@ -26,12 +26,12 @@ plain HTTPS with no git involved:
 ```json
 {
   "dependencies": {
-    "a11y-widget": "https://github.com/unixecho/a11y-widget/archive/refs/tags/v1.1.1.tar.gz"
+    "a11y-widget": "https://github.com/unixecho/a11y-widget/archive/refs/tags/v1.2.0.tar.gz"
   }
 }
 ```
 
-(`github:unixecho/a11y-widget#v1.1.1` resolves to the same code wherever git
+(`github:unixecho/a11y-widget#v1.2.0` resolves to the same code wherever git
 is available.)
 
 Then in `next.config.js`/`next.config.mjs`, tell Next to transpile it (it
@@ -90,6 +90,8 @@ interface A11yWidgetConfig {
   storageKey?: string        // localStorage key — SEE MIGRATION NOTE BELOW
   defaultLang?: 'he' | 'en' | 'ar'  // seed before <html lang> is observed
   statementHref?: string     // link to the host's own accessibility statement, shown in the panel footer
+  localeButton?: string | string[]  // the host's locale (globe) button — see "Turning it off" below
+  avoid?: string | string[]  // extra elements the launcher must never cover — see "Staying out of the way"
 }
 ```
 
@@ -111,13 +113,13 @@ Two `localStorage` keys, both derived from `storageKey`:
 | Key | Holds |
 |---|---|
 | `<storageKey>` | the page adjustments (`A11yPrefs`) — what *Reset settings* clears |
-| `<storageKey>:ui` | the widget's own chrome: `{ corner, introSeen }` |
+| `<storageKey>:ui` | the widget's own chrome: `{ corner, introSeen, disabled }` |
 
 They are separate on purpose. *Reset settings* clears adjustments, and should
 not silently drag the button back to another corner; and keeping the `A11yPrefs`
 shape untouched means an app still reading the key with an older copy of this
 widget keeps working. Upgrading needs no migration — a missing `:ui` key just
-means "never chose a corner, intro not yet seen".
+means "never chose a corner, intro not yet seen, widget on".
 
 ## The button itself: hide it, move it, how it arrives
 
@@ -157,6 +159,51 @@ lives in the panel and needs no host configuration.
   *Pause animations* both strip this down: the button simply appears and
   disappears, with no pill and no pulse, and nothing waits on an animation that
   has been switched off.
+
+## Staying out of the way of the page's own controls
+
+The launcher never sits on top of the host's buttons. It looks for them itself:
+every visible button, link or control that is **fixed or sticky** (it, or
+something it sits in) and reaches one of the four corners — a back button, a
+cart, a tab bar, a chat bubble, the language globe — plus anything matching
+`config.avoid` or carrying a `data-a11y-avoid` attribute (use that for a bar
+that is not itself a control). If the visitor's chosen corner is taken, the
+launcher glides to the nearest free one: across first, then up/down, then the
+diagonal. It looks again whenever the page changes, resizes, scrolls or finishes
+an animation — a cart that appears later moves it, and it returns to the chosen
+corner once the way is clear. If every corner is taken it settles for the
+least-covered one. Ordinary buttons in the page's flow are ignored on purpose: one
+scrolling under a corner would otherwise make the launcher skip about as the
+visitor reads. The visitor's *choice* of corner is never overwritten — this only
+decides where the button is *right now*.
+
+## Turning it off, and the way back
+
+Besides *Hide this button* (until refresh), the panel has **Turn off the
+accessibility widget**, which is **remembered**: the widget stays off on every
+later load until it is turned on again. Adjustments the visitor already chose stay
+applied.
+
+- **The notice.** Once it is off, a sheet explains how to turn it back on — with a
+  picture of the globe and its menu. It opens only after the launcher has left
+  *and the page's own animations have finished* (`document.getAnimations()`;
+  infinite animations are not waited for, and the wait is capped at 8 seconds).
+  *Got it* sends focus to the globe; *Undo — keep it on* turns the widget straight
+  back on.
+- **The way back is the globe (locale) button.** While the widget is off, an
+  *Enable accessibility widget* item is appended to the menu the globe opens. It
+  is append-only (nothing of the host's is edited or removed), has its own styling
+  and goes away when the widget is turned on. On **every load where it is off**,
+  once the page has settled and the globe exists, a hint reading *Enable
+  accessibility widget here* (in the page's language) appears beside the globe for
+  9 seconds with two soft pulses on it; any tap or key dismisses it. A page with no
+  globe shows the same text as a button in the launcher's corner. **F2** turns the
+  widget back on too, and opens the panel.
+- **Finding the globe.** `config.localeButton` takes a CSS selector or a list;
+  the default (`DEFAULT_LOCALE_SELECTORS`) is the portal's `#main > div > button`
+  narrowed to `[aria-haspopup="menu"]`, plus a button that opens a menu and is named
+  "שינוי שפה" / "Change language" / "تغيير اللغة". The menu it opens is found by
+  `aria-controls`, else a `[role="menu"]` inside the button's wrapper.
 
 ## What's real, and why the profiles aren't a shortcut around that
 

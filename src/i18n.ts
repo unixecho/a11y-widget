@@ -94,6 +94,53 @@ export const A11Y_UI = {
   toastRestore: { he: 'החזרת הכפתור', en: 'Bring it back', ar: 'إعادة الزر' },
   toastDismiss: { he: 'סגירת ההודעה', en: 'Dismiss', ar: 'إغلاق الإشعار' },
 
+  // ── turning the widget OFF (remembered across visits) and back on ─────────
+  // Distinct from "Hide this button" above, which only lasts until a refresh.
+  disableButton: {
+    he: 'כיבוי כלי הנגישות',
+    en: 'Turn off the accessibility widget',
+    ar: 'إيقاف أداة إمكانية الوصول',
+  },
+  disableHint: {
+    he: 'נשאר כבוי גם אחרי רענון. מפעילים אותו מחדש מכפתור הגלובוס (שפה).',
+    en: 'Stays off after a refresh. Turn it back on from the globe (language) button.',
+    ar: 'يبقى متوقفًا بعد إعادة تحميل الصفحة. أعد تشغيله من زر الكرة الأرضية (اللغة).',
+  },
+
+  // The notice shown once it is off. `noticeStep2` quotes `enableItem` word for
+  // word — it is the label of the item the visitor is being told to look for —
+  // and the harness holds the two together in every language.
+  noticeTitle: { he: 'כלי הנגישות כבוי', en: 'Accessibility widget is off', ar: 'أداة إمكانية الوصول متوقفة' },
+  noticeBody: {
+    he: 'הוא לא יופיע בביקורים הבאים עד שתפעילו אותו שוב. הנה איך:',
+    en: 'It won’t show up on your next visits until you turn it back on. Here’s how:',
+    ar: 'لن تظهر في زياراتك القادمة حتى تعيد تشغيلها. إليك الطريقة:',
+  },
+  noticeStep1: {
+    he: 'לחצו על כפתור הגלובוס (שפה).',
+    en: 'Tap the globe (language) button.',
+    ar: 'اضغط على زر الكرة الأرضية (اللغة).',
+  },
+  noticeStep2: {
+    he: 'בתפריט שנפתח, בחרו ״הפעלת כלי הנגישות״.',
+    en: 'In the menu that opens, choose “Enable accessibility widget”.',
+    ar: 'في القائمة التي تفتح، اختر «تفعيل أداة إمكانية الوصول».',
+  },
+  noticeKeyHint: { he: 'במקלדת: הקישו {key}.', en: 'On a keyboard, press {key}.', ar: 'على لوحة المفاتيح: اضغط {key}.' },
+  noticeSettings: {
+    he: 'ההתאמות שבחרתם נשארות פעילות.',
+    en: 'Adjustments you already chose stay applied.',
+    ar: 'تبقى التعديلات التي اخترتها مفعّلة.',
+  },
+  noticeGotIt: { he: 'הבנתי', en: 'Got it', ar: 'فهمت' },
+  noticeUndo: { he: 'ביטול — להשאיר פעיל', en: 'Undo — keep it on', ar: 'تراجع — إبقاؤها مفعّلة' },
+
+  // The item added to the globe's menu, the hint beside the globe on a load
+  // where the widget is off, and what a screen reader hears when it comes back.
+  enableItem: { he: 'הפעלת כלי הנגישות', en: 'Enable accessibility widget', ar: 'تفعيل أداة إمكانية الوصول' },
+  reenableHint: { he: 'הפעלת כלי הנגישות כאן', en: 'Enable accessibility widget here', ar: 'تفعيل أداة إمكانية الوصول هنا' },
+  enabledAnnounce: { he: 'כלי הנגישות הופעל', en: 'Accessibility widget enabled', ar: 'تم تفعيل أداة إمكانية الوصول' },
+
   on: { he: 'פעיל', en: 'On', ar: 'مفعّل' },
   off: { he: 'כבוי', en: 'Off', ar: 'معطّل' },
 } satisfies Record<string, Record<Lang, string>>

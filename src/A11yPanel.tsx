@@ -41,13 +41,16 @@ const ARROW_AXIS: Record<string, CornerAxis> = {
 }
 
 export default function A11yPanel({
-  open, onClose, onHide, restoreFocus,
+  open, onClose, onHide, onDisable, restoreFocus,
 }: {
   open: boolean
   onClose: () => void
   /** Hides the launcher. When omitted the "Hide this button" control is not
    *  rendered — a host composing the pieces by hand opts in explicitly. */
   onHide?: () => void
+  /** Turns the whole widget off, remembered across visits. Opt-in like
+   *  `onHide`: without it the "Turn off" control is not rendered. */
+  onDisable?: () => void
   /** Passed straight to the sheet. See A11ySheet. */
   restoreFocus?: boolean
 }) {
@@ -59,6 +62,7 @@ export default function A11yPanel({
   // with aria-labelledby/-describedby, so the accessible name stays "Hide this
   // button" instead of swallowing the whole hint sentence.
   const hideId = useId()
+  const disableId = useId()
 
   return (
     <A11ySheet open={open} onClose={onClose} label={t('title')} dir={dir} restoreFocus={restoreFocus}>
@@ -188,6 +192,27 @@ export default function A11yPanel({
             <span className="a11yw-btn-ghost-text">
               <span id={`${hideId}-label`} className="a11yw-btn-ghost-label">{t('hideButton')}</span>
               <span id={`${hideId}-hint`} className="a11yw-btn-ghost-hint">{withKey(t('hideHint'))}</span>
+            </span>
+          </button>
+        )}
+        {/* The remembered, bigger step: the button stays gone on every later
+            visit. Its hint names the way back before the choice is made. */}
+        {onDisable && (
+          <button
+            type="button"
+            className="a11yw-btn-ghost a11yw-press"
+            onClick={() => { haptic('select'); onDisable() }}
+            aria-labelledby={`${disableId}-label`}
+            aria-describedby={`${disableId}-hint`}
+          >
+            <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flex: '0 0 auto' }}>
+              <path d="M12 3v8" />
+              <path d="M6.4 6.6a8 8 0 1 0 11.2 0" />
+            </svg>
+            <span className="a11yw-btn-ghost-text">
+              <span id={`${disableId}-label`} className="a11yw-btn-ghost-label">{t('disableButton')}</span>
+              <span id={`${disableId}-hint`} className="a11yw-btn-ghost-hint">{t('disableHint')}</span>
             </span>
           </button>
         )}

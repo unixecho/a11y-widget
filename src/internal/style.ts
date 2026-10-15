@@ -550,9 +550,166 @@ html.a11y-motion-off .a11yw-toast-ring { display: none; }
   .a11yw-corner-dot { transition: none !important; }
 }
 
+/* ============================================================
+   Turning the widget off, and back on.
+   The notice (a sheet, so it inherits the panel's scrim, focus trap and
+   motion), the hint beside the host's globe, and the item this package adds
+   to the menu the globe opens.
+   ============================================================ */
+.a11yw-notice {
+  display: flex; flex-direction: column; gap: 12px; padding-top: 4px;
+  overflow-y: auto; min-height: 0; -webkit-overflow-scrolling: touch;
+}
+
+/* A miniature of what the visitor is about to do: the globe, and the menu it
+   opens with the "enable" row lit. Decoration (aria-hidden); the steps below
+   say the same in words. direction: ltr — a picture of a screen, laid out
+   physically like the real thing. */
+.a11yw-notice-art {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  width: max-content; max-width: 100%; margin: 6px auto 2px; direction: ltr;
+}
+.a11yw-notice-globe {
+  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+  border: 1px solid var(--a11y-accent, var(--neon, #ff5e3a));
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--a11y-text, var(--text, #f5f3ef));
+  box-shadow: 0 0 18px rgba(255, 94, 58, 0.3);
+}
+.a11yw-notice-menu {
+  display: flex; flex-direction: column; gap: 4px; padding: 6px; min-width: 190px; box-sizing: border-box;
+  border-radius: 14px; background: var(--a11y-bg-elev, var(--bg-elev-2, #1d1d2b));
+  border: 1px solid var(--a11y-line-strong, var(--line-strong, rgba(245,243,239,0.14)));
+}
+.a11yw-notice-row { display: block; height: 22px; border-radius: 8px; background: rgba(255, 255, 255, 0.06); }
+.a11yw-notice-row:first-child { width: 62%; }
+.a11yw-notice-row:nth-child(2) { width: 46%; }
+.a11yw-notice-row-on {
+  position: relative; display: flex; align-items: center; gap: 7px; height: auto; min-height: 30px; padding: 5px 9px;
+  background: rgba(255, 94, 58, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 94, 58, 0.45);
+  color: var(--a11y-text, var(--text, #f5f3ef)); font-size: 0.8rem; font-weight: 700; line-height: 1.3;
+}
+.a11yw-notice-row-on svg { flex: 0 0 auto; color: var(--a11y-accent, var(--neon, #ff5e3a)); }
+.a11yw-notice-row-text { unicode-bidi: plaintext; }
+.a11yw-notice-row-on::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+  border: 2px solid var(--a11y-accent, var(--neon, #ff5e3a));
+  animation: a11yw-hint-ring 1.5s var(--a11y-ease, cubic-bezier(0.22,1,0.36,1)) .5s 2 backwards;
+}
+
+.a11yw-notice-title { margin: 4px 0 0; text-align: center; font-size: 1.15rem; font-weight: 800; color: var(--a11y-text, var(--text, #f5f3ef)); }
+.a11yw-notice-body { margin: 0; text-align: center; font-size: 0.9rem; line-height: 1.55; color: var(--a11y-text-dim, var(--text-dim, #a8a5b0)); }
+.a11yw-notice-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.a11yw-notice-steps li {
+  display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04); color: var(--a11y-text, var(--text, #f5f3ef));
+  font-size: 0.9rem; line-height: 1.5;
+}
+.a11yw-notice-n {
+  flex: 0 0 auto; width: 24px; height: 24px; margin-top: 1px; border-radius: 999px; display: grid; place-items: center;
+  font-size: 0.8rem; font-weight: 800;
+  background: linear-gradient(135deg, var(--a11y-accent, var(--neon, #ff5e3a)), var(--a11y-accent-soft, var(--neon-soft, #ff8a5c)));
+  color: var(--a11y-bg, var(--bg, #0b0b12));
+}
+.a11yw-notice-note { margin: 0; text-align: center; font-size: 0.78rem; line-height: 1.5; color: var(--a11y-text-dim, var(--text-dim, #a8a5b0)); }
+.a11yw-notice-actions { display: flex; gap: 8px; padding-top: 4px; }
+.a11yw-notice-actions > button { flex: 1; min-height: 44px; padding: 10px 8px; }
+/* No F2 key on a touch-only device. */
+@media (hover: none) and (pointer: coarse) {
+  .a11yw-notice-keyhint { display: none; }
+}
+
+/* The hint beside the globe on a load where the widget is off. Fixed, placed by
+   script from the globe's own rectangle; pointer-events: none so it can never
+   sit between a visitor and anything they are tapping. 'translate' (not
+   'transform') centres it on the globe, so the entrance below is free to
+   animate 'transform' without fighting it. */
+.a11yw-hint {
+  position: fixed; z-index: 2147483001; translate: 0 -50%;
+  box-sizing: border-box; display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-radius: 14px; pointer-events: none;
+  background: var(--a11y-bg-elev, var(--bg-elev-2, #1d1d2b));
+  color: var(--a11y-text, var(--text, #f5f3ef));
+  border: 1px solid var(--a11y-accent, var(--neon, #ff5e3a));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 22px rgba(255, 94, 58, 0.22);
+  font-family: inherit; font-size: 0.84rem; font-weight: 700; line-height: 1.35;
+  --a11yw-hx: -10px;
+  animation: a11yw-hint-in .5s var(--a11y-ease, cubic-bezier(0.22,1,0.36,1)) backwards;
+}
+.a11yw-hint[data-side='left'] { --a11yw-hx: 10px; }
+.a11yw-hint[data-state='out'] { animation: a11yw-hint-out .22s var(--a11y-ease, cubic-bezier(0.22,1,0.36,1)) forwards; }
+.a11yw-hint-icon { flex: 0 0 auto; color: var(--a11y-accent, var(--neon, #ff5e3a)); }
+/* The pointer: a rotated square on the edge facing the globe, showing only the
+   two borders that form the point. */
+.a11yw-hint::before {
+  content: ''; position: absolute; top: 50%; width: 10px; height: 10px; margin-top: -5px;
+  background: inherit; transform: rotate(45deg);
+  border: 0 solid var(--a11y-accent, var(--neon, #ff5e3a));
+}
+.a11yw-hint[data-side='right']::before { left: -6px; border-width: 0 0 1px 1px; }
+.a11yw-hint[data-side='left']::before  { right: -6px; border-width: 1px 1px 0 0; }
+@keyframes a11yw-hint-in {
+  from { opacity: 0; transform: translateX(var(--a11yw-hx)) scale(.94); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes a11yw-hint-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateX(var(--a11yw-hx)) scale(.96); }
+}
+
+/* Two soft pulses around the globe itself, then it is still. */
+.a11yw-hint-ring {
+  position: fixed; z-index: 2147483001; box-sizing: border-box; pointer-events: none; border-radius: 16px;
+  border: 2px solid var(--a11y-accent, var(--neon, #ff5e3a));
+  animation: a11yw-hint-ring 1.5s var(--a11y-ease, cubic-bezier(0.22,1,0.36,1)) .15s 2 backwards;
+  opacity: 0;
+}
+.a11yw-hint-ring[data-state='out'] { display: none; }
+@keyframes a11yw-hint-ring {
+  from { transform: scale(1); opacity: .9; }
+  to   { transform: scale(1.5); opacity: 0; }
+}
+
+/* With no globe on the page the hint is the way back, so it is a real button in
+   the launcher's corner, not a pointer. */
+.a11yw-hint-fallback {
+  translate: none; pointer-events: auto; cursor: pointer; max-width: calc(100vw - 32px);
+  --a11yw-hx: 0px;
+}
+.a11yw-hint-fallback::before { display: none; }
+.a11yw-hint-top-left     { left: 16px;  top: calc(env(safe-area-inset-top) + 16px); }
+.a11yw-hint-top-right    { right: 16px; top: calc(env(safe-area-inset-top) + 16px); }
+.a11yw-hint-bottom-left  { left: 16px;  bottom: calc(env(safe-area-inset-bottom) + 16px); }
+.a11yw-hint-bottom-right { right: 16px; bottom: calc(env(safe-area-inset-bottom) + 16px); }
+.a11yw-hint-fallback:focus-visible { outline: 2px solid var(--a11y-text, var(--text, #f5f3ef)); outline-offset: 2px; }
+
+/* The item added to the host's globe menu. Its own look, not a copy of the
+   host's: the accent tint marks it as the one thing here that is the widget's. */
+.a11yw-globe-sep { height: 1px; margin: 4px 6px; background: var(--a11y-line-strong, var(--line-strong, rgba(245,243,239,0.14))); }
+.a11yw-globe-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; min-height: 44px;
+  padding: 9px 12px; border: 0; border-radius: 10px; cursor: pointer;
+  background: rgba(255, 94, 58, 0.12); box-shadow: inset 0 0 0 1px rgba(255, 94, 58, 0.3);
+  color: var(--a11y-text, var(--text, #f5f3ef));
+  font: inherit; font-weight: 600; text-align: start; white-space: nowrap;
+}
+.a11yw-globe-item svg { flex: 0 0 auto; color: var(--a11y-accent, var(--neon, #ff5e3a)); }
+.a11yw-globe-item:hover { background: rgba(255, 94, 58, 0.2); }
+.a11yw-globe-item:focus-visible { outline: 2px solid var(--a11y-accent, var(--neon, #ff5e3a)); outline-offset: 2px; }
+
+/* Reduce: the hint and the lit row simply appear; no travel, no pulses. */
+@media (prefers-reduced-motion: reduce) {
+  .a11yw-hint, .a11yw-hint[data-state='out'], .a11yw-notice-row-on::after { animation: none !important; }
+  .a11yw-hint-ring { display: none; }
+}
+html.a11y-motion-off .a11yw-hint-ring, html.a11y-motion-off .a11yw-notice-row-on::after { display: none; }
+
 /* Windows high-contrast: the gradients and tints above are dropped by the
    system, so the shapes that carry meaning get real borders. */
 @media (forced-colors: active) {
+  .a11yw-hint, .a11yw-notice-menu, .a11yw-notice-globe, .a11yw-globe-item { border: 1px solid CanvasText; }
+  .a11yw-hint::before { border-color: CanvasText; }
+  .a11yw-notice-n { border: 1px solid CanvasText; }
   .a11yw-toast { border: 1px solid CanvasText; }
   .a11yw-corner-dot { border: 2px solid ButtonText; }
   .a11yw-corner[aria-checked='true'] .a11yw-corner-dot { border-color: Highlight; background: Highlight; color: HighlightText; }

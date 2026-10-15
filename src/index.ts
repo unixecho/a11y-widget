@@ -7,12 +7,15 @@ export { default as A11yProvider, useA11y } from './A11yProvider'
 export { default as A11yLauncher } from './A11yLauncher'
 export { default as A11yPanel } from './A11yPanel'
 export { default as A11yToast } from './A11yToast'
+export { default as A11yDisableNotice } from './A11yDisableNotice'
+export { default as A11yReEnable } from './A11yReEnable'
 export { default as ReadingGuide } from './ReadingGuide'
 
 export {
   DEFAULT_A11Y_PREFS,
   DEFAULT_A11Y_CONFIG,
   DEFAULT_A11Y_UI,
+  DEFAULT_LOCALE_SELECTORS,
   FONT_SCALE_STEPS,
   SPACING_STEPS,
   CONTRAST_MODES,
@@ -37,6 +40,12 @@ export type {
 } from './types'
 export type { A11yLauncherProps } from './A11yLauncher'
 export type { A11yToastProps } from './A11yToast'
+export type { A11yDisableNoticeProps } from './A11yDisableNotice'
+export type { A11yReEnableProps } from './A11yReEnable'
+
+export { useAvoidingCorner, AVOID_ATTRIBUTE } from './internal/avoid'
+export { pickCorner, cornerBox, candidateCorners } from './placement'
+export type { Box } from './placement'
 
 export { computeAppliedState, ALL_A11Y_HTML_CLASSES } from './apply'
 export type { AppliedA11yState } from './apply'

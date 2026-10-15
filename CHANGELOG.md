@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.2.0 — 2026-10-15
+
+Two things the owner asked for: the button must never sit on top of the site's
+own controls, and the widget must be switchable off for good with a way back
+that lives on the language (globe) button.
+
+- **The launcher stays out of the way.** It finds, by itself, every visible
+  button/link that is **fixed or sticky** and reaches one of the four corners
+  (a back button, a cart, a tab bar, the globe…) plus anything named in
+  `config.avoid` or carrying `data-a11y-avoid`, and moves to the nearest free
+  corner — across first, then up/down, then the diagonal — with the existing
+  glide. It looks again when the page changes, resizes, scrolls or finishes an
+  animation, so a cart that appears later moves it, and it comes back to the
+  visitor's chosen corner when the way is clear. With every corner taken it
+  settles for the least-covered one rather than hopping. Pure rule:
+  `placement.ts` (`pickCorner`, exported); DOM half: `internal/avoid.ts`
+  (`useAvoidingCorner`, exported). Ordinary in-flow buttons are ignored on
+  purpose — chasing one that scrolls under a corner would make it skip about.
+- **Turn the widget off.** A second control at the foot of the panel, next to
+  *Hide this button*, switches the widget off **and it is remembered**: every
+  later load starts with no launcher. (Hide is unchanged — memory only, back on
+  refresh.) Stored as `disabled` in the `<storageKey>:ui` blob; a blob from
+  1.1.x has no such field and loads as *on*, and a corrupt value never turns the
+  widget off. Adjustments the visitor already chose stay applied.
+  - **A notice**, once it is off: how to turn it back on, with a picture of the
+    globe and its menu. It opens only after the launcher's outro **and the
+    page's own animations have finished** (`internal/settle.ts` asks
+    `document.getAnimations()`; infinite animations are not waited for, and the
+    wait is capped at 8s). Its buttons are *Got it* (focus goes to the globe)
+    and *Undo — keep it on*.
+  - **The way back is the globe button.** While the widget is off, an
+    *Enable accessibility widget* item is appended to the menu the globe opens
+    (`internal/globeMenu.ts` — append-only, its own styling, removed again when
+    the widget is on). **On every load where it is off**, once the page has
+    settled and the globe exists, a hint reading *Enable accessibility widget
+    here* (in the page's language) appears beside the globe for 9s with two soft
+    pulses on the globe; any tap or key ends it. A page with no globe gets the
+    same text as a button in the launcher's corner. **F2** also turns it back on.
+  - The globe is found with `config.localeButton` (a selector or a list),
+    default `DEFAULT_LOCALE_SELECTORS`: the portal's `#main > div > button`
+    narrowed to `[aria-haspopup="menu"]`, plus the button's accessible name in
+    Hebrew, English and Arabic.
+- Lifecycle reducer: new `DISABLE` / `ENABLE` / `NOTICE_*` / `HINT_*` actions,
+  two new invariants (a notice or hint is only up while the widget is off; an
+  off widget never has a usable launcher). `READY` now carries `disabled`.
+- New exports: `A11yDisableNotice`, `A11yReEnable`, `useAvoidingCorner`,
+  `pickCorner`, `cornerBox`, `candidateCorners`, `AVOID_ATTRIBUTE`,
+  `DEFAULT_LOCALE_SELECTORS`; `A11yUiState` gains `disabled`; `A11yPanel` gains an
+  opt-in `onDisable` prop. Two new coverage items for the accessibility
+  statement (`avoid-page-controls`, `turn-off`).
+- Harness: 193 checks (was 120) — placement, the off/on flow under random event
+  orders, the settle loop against a fake page, and the globe menu staying
+  append-only.
+
 ## 1.1.1 — 2026-10-03
 
 A fix to the 1.1.0 toast, found by the first real visitor to use it on a phone.

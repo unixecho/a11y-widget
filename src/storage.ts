@@ -73,6 +73,7 @@ export function sanitizeA11yUi(raw: unknown): A11yUiState {
   return {
     corner: isA11yCorner(r.corner) ? r.corner : DEFAULT_A11Y_UI.corner,
     introSeen: typeof r.introSeen === 'boolean' ? r.introSeen : DEFAULT_A11Y_UI.introSeen,
+    disabled: typeof r.disabled === 'boolean' ? r.disabled : DEFAULT_A11Y_UI.disabled,
   }
 }
 

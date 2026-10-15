@@ -11,13 +11,20 @@
 // Timers are NOT in here — A11yWidget owns them (an effect per timed phase).
 // This file only says what state follows what event.
 //
-// DELIBERATELY NOT PERSISTED: whether the launcher is hidden lives in memory
-// only, so a page refresh always brings it back. A hide that survived reloads
-// could lock out a visitor who hid it by accident and *does* need it, and
-// "just refresh" is the one recovery that needs no keyboard and no
-// discoverability. (Next.js client-side navigation keeps the widget mounted,
-// so it also stays hidden while the visitor browses around — it only returns
-// on a real reload, which is the behaviour a visitor who hid it expects.)
+// TWO WAYS TO MAKE THE BUTTON GO AWAY, AND ONLY ONE IS REMEMBERED:
+//   • HIDE ("Hide this button") lives in memory only, so a page refresh always
+//     brings the button back. A hide that survived reloads could lock out a
+//     visitor who hid it by accident and *does* need it, and "just refresh" is
+//     the one recovery that needs no keyboard and no discoverability.
+//     (Next.js client-side navigation keeps the widget mounted, so it also stays
+//     hidden while the visitor browses around — it only returns on a real
+//     reload, which is the behaviour a visitor who hid it expects.)
+//   • DISABLE ("Turn off the widget") IS remembered — storage.ts keeps it — so
+//     the widget stays off on every later load. That is the whole point of it,
+//     and it is why it never leaves the visitor without a way back: the host's
+//     locale (globe) button gets an "enable" item, a hint points at the globe on
+//     every load, and the shortcut key works too. After turning it off, a notice
+//     explains all of that — once the page has stopped animating (settle.ts).
 
 // ── timings shared by the timers (A11yWidget/A11yToast) and the CSS ──────────
 // The CSS durations in internal/style.ts are written to match these; the
@@ -36,6 +43,10 @@ export const LAUNCHER_LEAVE_MS = 380
  *  WCAG 2.2.1 (Timing Adjustable). Must stay >= 5000 — the harness holds it. */
 export const TOAST_VISIBLE_MS = 5_000
 export const TOAST_LEAVE_MS = 220
+/** How long the "enable it here" hint stays beside the globe on a load where the
+ *  widget is off. Long enough to read a short line in any of the three languages,
+ *  short enough that it never feels like it is nagging. */
+export const REENABLE_HINT_MS = 9_000
 
 /** What the visitor is doing to the toast right now. */
 export interface ToastEngagement {
@@ -65,6 +76,13 @@ export function toastHeld(e: ToastEngagement): boolean {
  *  `hidden` = gone; only the F2 listener and the toast remain. */
 export type LauncherPhase = 'pending' | 'entering' | 'visible' | 'leaving' | 'hidden'
 export type ToastPhase = 'none' | 'in' | 'out'
+/** The notice that explains how to turn the widget back on. `pending` = the
+ *  visitor has just turned it off and we are waiting for the page to stop
+ *  animating; `open` = it is on screen. */
+export type NoticePhase = 'none' | 'pending' | 'open'
+/** The hint beside the globe on a load where the widget is off. `pending` =
+ *  waiting for the globe to exist and the page to settle; `shown` = visible. */
+export type HintPhase = 'none' | 'pending' | 'shown'
 /** `full` = the first-visit intro (pop, pulse, label). `quick` = every later
  *  entrance, including a restore: the pop alone. */
 export type IntroKind = 'full' | 'quick'
@@ -74,6 +92,10 @@ export interface LauncherState {
   /** Panel open. Only ever true while the launcher is `entering`/`visible`. */
   open: boolean
   toast: ToastPhase
+  /** The visitor has the widget turned off (mirrors the persisted setting). */
+  disabled: boolean
+  notice: NoticePhase
+  hint: HintPhase
   intro: IntroKind
   /** Bumped on every (re)entrance. Used as the launcher's React key so a
    *  restore remounts it and the entrance animation plays from frame zero,
@@ -91,6 +113,9 @@ export const INITIAL_LAUNCHER_STATE: LauncherState = {
   phase: 'pending',
   open: false,
   toast: 'none',
+  disabled: false,
+  notice: 'none',
+  hint: 'none',
   intro: 'quick',
   epoch: 0,
   focusToast: false,
@@ -98,13 +123,22 @@ export const INITIAL_LAUNCHER_STATE: LauncherState = {
 }
 
 export type LauncherAction =
-  | { type: 'READY'; firstVisit: boolean }
+  | { type: 'READY'; firstVisit: boolean; disabled: boolean }
   | { type: 'OPEN' }
   | { type: 'CLOSE' }
   /** The F2 key. Opens/closes the panel; while hidden, restores AND opens. */
   | { type: 'TOGGLE' }
   | { type: 'HIDE'; focusToast: boolean }
   | { type: 'SHOW'; focusLauncher: boolean }
+  /** "Turn off the widget": persisted, unlike HIDE. */
+  | { type: 'DISABLE' }
+  /** Turn it back on (the globe's menu item). Not a restore-and-open: the panel
+   *  stays closed, the button just comes back. */
+  | { type: 'ENABLE'; focusLauncher: boolean }
+  | { type: 'NOTICE_OPEN' }
+  | { type: 'NOTICE_CLOSE' }
+  | { type: 'HINT_SHOW' }
+  | { type: 'HINT_DONE' }
   | { type: 'ENTERED' }
   | { type: 'LEFT' }
   | { type: 'TOAST_DISMISS' }
@@ -122,6 +156,11 @@ function show(s: LauncherState, open: boolean, focusLauncher: boolean): Launcher
     epoch: s.epoch + 1,
     focusLauncher,
     focusToast: false,
+    // Bringing the button back by any route turns the widget on — and a notice
+    // or hint about it being off has nothing left to say.
+    disabled: false,
+    notice: 'none',
+    hint: 'none',
     // A toast still on screen has done its job the moment the launcher is
     // back — it leaves instead of lingering next to the thing it described.
     toast: s.toast === 'in' ? 'out' : s.toast,
@@ -132,11 +171,17 @@ function show(s: LauncherState, open: boolean, focusLauncher: boolean): Launcher
  *    1. `open` implies the launcher is `entering`/`visible`.
  *    2. `toast === 'in'` implies the launcher is `leaving`/`hidden`.
  *    3. `epoch` only ever increases.
- *    4. `pending` is only ever the initial phase. */
+ *    4. `pending` is only ever the initial phase.
+ *    5. A notice or hint is only ever up while the widget is `disabled`.
+ *    6. `disabled` implies the launcher is `leaving`/`hidden` — a widget that is
+ *       switched off never has a usable button. */
 export function launcherReducer(s: LauncherState, a: LauncherAction): LauncherState {
   switch (a.type) {
     case 'READY':
       if (s.phase !== 'pending') return s
+      // Switched off on a previous visit: there is no launcher to bring in. The
+      // hint beside the globe is the one thing this load has to say.
+      if (a.disabled) return { ...s, phase: 'hidden', disabled: true, hint: 'pending', epoch: s.epoch + 1 }
       return { ...s, phase: 'entering', intro: a.firstVisit ? 'full' : 'quick', epoch: s.epoch + 1 }
 
     case 'OPEN':
@@ -156,6 +201,36 @@ export function launcherReducer(s: LauncherState, a: LauncherAction): LauncherSt
 
     case 'SHOW':
       return away(s.phase) ? show(s, false, a.focusLauncher) : s
+
+    case 'DISABLE':
+      if (s.disabled || s.phase === 'pending') return s
+      // From a visible launcher it plays the outro first; from an already-hidden
+      // one (the toast may still be up) there is nothing left to play.
+      return {
+        ...s,
+        phase: interactive(s.phase) ? 'leaving' : s.phase,
+        open: false,
+        disabled: true,
+        notice: 'pending',
+        hint: 'none',
+        // The notice says everything the toast would: one voice, not two.
+        toast: s.toast === 'in' ? 'out' : s.toast,
+      }
+
+    case 'ENABLE':
+      return s.disabled ? show(s, false, a.focusLauncher) : s
+
+    case 'NOTICE_OPEN':
+      return s.notice === 'pending' && s.disabled && s.phase === 'hidden' ? { ...s, notice: 'open' } : s
+
+    case 'NOTICE_CLOSE':
+      return s.notice === 'none' ? s : { ...s, notice: 'none' }
+
+    case 'HINT_SHOW':
+      return s.hint === 'pending' && s.disabled ? { ...s, hint: 'shown' } : s
+
+    case 'HINT_DONE':
+      return s.hint === 'none' ? s : { ...s, hint: 'none' }
 
     case 'ENTERED':
       return s.phase === 'entering' ? { ...s, phase: 'visible' } : s

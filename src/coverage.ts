@@ -142,6 +142,22 @@ export const WIDGET_COVERAGE: CoverageItem[] = [
     },
   },
   {
+    id: 'avoid-page-controls',
+    labels: {
+      he: 'כפתור הנגישות זז מעצמו לפינה פנויה כדי לא לכסות כפתורים של האתר עצמו, כמו חזרה, עגלה או החלפת שפה',
+      en: 'The accessibility button moves itself to a free corner so it never covers the site’s own controls, such as back, the cart or the language switch',
+      ar: 'ينتقل زر إمكانية الوصول تلقائيًا إلى ركن فارغ حتى لا يغطي عناصر الموقع نفسه، مثل الرجوع أو السلة أو تبديل اللغة',
+    },
+  },
+  {
+    id: 'turn-off',
+    labels: {
+      he: 'אפשרות לכבות את כלי הנגישות לגמרי, כך שלא יוצג בביקורים הבאים, ולהפעילו מחדש מכפתור החלפת השפה; ההתאמות שנבחרו נשארות פעילות',
+      en: 'An option to turn the accessibility widget off entirely, so it is not shown on later visits, and to turn it back on from the language button; the adjustments already chosen stay active',
+      ar: 'خيار لإيقاف أداة إمكانية الوصول بالكامل بحيث لا تظهر في الزيارات القادمة، وإعادة تشغيلها من زر تبديل اللغة؛ وتبقى التعديلات المختارة مفعّلة',
+    },
+  },
+  {
     id: 'persisted',
     labels: {
       he: 'ההעדפות נשמרות במכשיר ונשארות פעילות בביקורים הבאים, עד לאיפוס ידני',

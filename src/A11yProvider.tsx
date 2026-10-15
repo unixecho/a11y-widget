@@ -27,6 +27,10 @@ interface A11yContextValue {
   /** Whether the full first-visit intro has already played on this device. */
   introSeen: boolean
   markIntroSeen: () => void
+  /** The visitor has turned the widget off (persisted). The provider only
+   *  stores it — A11yWidget is what acts on it. */
+  disabled: boolean
+  setDisabled: (disabled: boolean) => void
   lang: Lang
   dir: 'rtl' | 'ltr'
   config: ResolvedA11yConfig
@@ -122,14 +126,17 @@ export default function A11yProvider({ children, config = {} }: { children: Reac
   const markIntroSeen = useCallback(() => {
     setUi((prev) => (prev.introSeen ? prev : { ...prev, introSeen: true }))
   }, [])
+  const setDisabled = useCallback((disabled: boolean) => {
+    setUi((prev) => (prev.disabled === disabled ? prev : { ...prev, disabled }))
+  }, [])
   const corner = ui.corner ?? resolvedConfig.corner
 
   const value = useMemo(
     () => ({
       prefs, ready, set, patch, reset, corner, setCorner,
-      introSeen: ui.introSeen, markIntroSeen, lang, dir, config: resolvedConfig,
+      introSeen: ui.introSeen, markIntroSeen, disabled: ui.disabled, setDisabled, lang, dir, config: resolvedConfig,
     }),
-    [prefs, ready, set, patch, reset, corner, setCorner, ui.introSeen, markIntroSeen, lang, dir, resolvedConfig],
+    [prefs, ready, set, patch, reset, corner, setCorner, ui.introSeen, markIntroSeen, ui.disabled, setDisabled, lang, dir, resolvedConfig],
   )
 
   return <A11yContext.Provider value={value}>{children}</A11yContext.Provider>
